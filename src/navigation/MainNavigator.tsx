@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { StyleSheet, View, Platform } from 'react-native';
+import { StyleSheet, View, Platform, TouchableOpacity } from 'react-native';
 import { Home, List, PieChart, Settings, Calendar as CalIcon, Landmark } from 'lucide-react-native';
 import Dashboard from '../screens/Dashboard';
 import AddTransaction from '../screens/AddTransaction';
@@ -14,66 +14,56 @@ import CalendarScreen from '../screens/CalendarScreen';
 import DebtScreen from '../screens/DebtScreen';
 import { useTheme } from '../theme/ThemeContext';
 import ReminderSettings from '../screens/ReminderSettings';
+import ManageCategories from '../screens/ManageCategories';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { useNavigation } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const TabNavigator = () => {
-    const { theme } = useTheme();
+    const { theme, colors } = useTheme();
+    const isDark = theme === 'dark';
 
     return (
         <Tab.Navigator
-            screenOptions={() => ({
+            screenOptions={{
                 headerShown: false,
-                tabBarStyle: [
-                    styles.tabBar,
-                    {
-                        backgroundColor: theme === 'dark' ? '#1D1B20' : '#F3EDF7',
-                        borderTopColor: theme === 'dark' ? '#49454F' : '#E7E0EC'
-                    }
-                ],
-                tabBarActiveTintColor: theme === 'dark' ? '#D0BCFF' : '#6750A4',
-                tabBarInactiveTintColor: theme === 'dark' ? '#CAC4D0' : '#49454F',
-                tabBarLabelStyle: styles.tabBarLabel,
-                tabBarHideOnKeyboard: true,
-            })}
+                tabBarStyle: {
+                    backgroundColor: colors.card,
+                    borderTopColor: colors.outline,
+                    height: 80,
+                    paddingBottom: 20,
+                    paddingTop: 10,
+                },
+                tabBarActiveTintColor: colors.primary,
+                tabBarInactiveTintColor: colors.onSurfaceVariant,
+            }}
         >
             <Tab.Screen
                 name="HomeTab"
                 component={Dashboard}
                 options={{
                     tabBarLabel: 'Home',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={[styles.iconContainer, focused && { backgroundColor: theme === 'dark' ? '#4F378B' : '#EADDFF' }]}>
-                            <Home color={color} size={24} />
-                        </View>
-                    ),
+                    tabBarIcon: ({ color }) => <Home color={color} size={24} />,
                 }}
             />
             <Tab.Screen
                 name="TransactionsTab"
                 component={Transactions}
                 options={{
-                    tabBarLabel: 'History',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={[styles.iconContainer, focused && { backgroundColor: theme === 'dark' ? '#4F378B' : '#EADDFF' }]}>
-                            <List color={color} size={24} />
-                        </View>
-                    ),
+                    tabBarLabel: 'All Flows',
+                    tabBarIcon: ({ color }) => <List color={color} size={24} />,
                 }}
             />
             <Tab.Screen
                 name="DebtTab"
                 component={DebtScreen}
                 options={{
-                    tabBarLabel: 'Debt',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={[styles.iconContainer, focused && { backgroundColor: theme === 'dark' ? '#4F378B' : '#EADDFF' }]}>
-                            <Landmark color={color} size={24} />
-                        </View>
-                    ),
+                    tabBarLabel: 'Debts',
+                    tabBarIcon: ({ color }) => <Landmark color={color} size={24} />,
                 }}
             />
             <Tab.Screen
@@ -81,11 +71,7 @@ const TabNavigator = () => {
                 component={Reports}
                 options={{
                     tabBarLabel: 'Reports',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={[styles.iconContainer, focused && { backgroundColor: theme === 'dark' ? '#4F378B' : '#EADDFF' }]}>
-                            <PieChart color={color} size={24} />
-                        </View>
-                    ),
+                    tabBarIcon: ({ color }) => <PieChart color={color} size={24} />,
                 }}
             />
             <Tab.Screen
@@ -93,11 +79,7 @@ const TabNavigator = () => {
                 component={SettingsScreen}
                 options={{
                     tabBarLabel: 'Settings',
-                    tabBarIcon: ({ color, focused }) => (
-                        <View style={[styles.iconContainer, focused && { backgroundColor: theme === 'dark' ? '#4F378B' : '#EADDFF' }]}>
-                            <Settings color={color} size={24} />
-                        </View>
-                    ),
+                    tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
                 }}
             />
         </Tab.Navigator>
@@ -118,15 +100,33 @@ const ChangePasscodeWrapper = ({ navigation, ...props }: any) => {
     );
 };
 
+const NotificationHandler = () => {
+    const navigation = useNavigation<any>();
+
+    React.useEffect(() => {
+        const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+            const screen = response.notification.request.content.data?.screen;
+            if (screen === 'AddTransaction') {
+                navigation.navigate('AddTransaction');
+            }
+        });
+
+        return () => subscription.remove();
+    }, [navigation]);
+
+    return null;
+};
+
 const MainNavigator = () => {
     return (
         <NavigationContainer>
+            <NotificationHandler />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="MainTabs" component={TabNavigator} />
                 <Stack.Screen
                     name="AddTransaction"
                     component={AddTransaction}
-                    options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                    options={{ presentation: 'modal', animation: 'slide_from_left' }}
                 />
                 <Stack.Screen
                     name="Profile"
@@ -136,7 +136,7 @@ const MainNavigator = () => {
                 <Stack.Screen
                     name="ChangePasscode"
                     component={ChangePasscodeWrapper}
-                    options={{ presentation: 'fullScreenModal' }}
+                    options={{ presentation: 'fullScreenModal', animation: 'slide_from_left' }}
                 />
                 <Stack.Screen
                     name="Calendar"
@@ -153,32 +153,18 @@ const MainNavigator = () => {
                     component={ReminderSettings}
                     options={{ animation: 'slide_from_right' }}
                 />
+                <Stack.Screen
+                    name="ManageCategories"
+                    component={ManageCategories}
+                    options={{ animation: 'slide_from_right' }}
+                />
             </Stack.Navigator>
         </NavigationContainer>
     );
 };
 
 const styles = StyleSheet.create({
-    tabBar: {
-        height: 80,
-        paddingBottom: Platform.OS === 'ios' ? 25 : 10,
-        paddingTop: 10,
-        borderTopWidth: 1,
-        elevation: 0,
-    },
-    tabBarLabel: {
-        fontSize: 12,
-        fontWeight: '500',
-        marginTop: 4,
-    },
-    iconContainer: {
-        width: 64,
-        height: 32,
-        borderRadius: 16,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 2,
-    }
+    container: { flex: 1 }
 });
 
 export default MainNavigator;

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
-import { ArrowRight, Lock, Shield, Sparkles } from 'lucide-react-native';
+import { ArrowRight, Lock, Shield, Sparkles, DollarSign } from 'lucide-react-native';
 import PasscodeScreen from './PasscodeScreen';
 import * as Haptics from 'expo-haptics';
 
@@ -16,19 +17,22 @@ const Onboarding = ({ onFinish, onSetPasscode }: { onFinish: () => void, onSetPa
 
     const steps = [
         {
-            title: 'Welcome to Antigravity',
+            title: 'Welcome to Budgeto',
             desc: 'A modern, private way to track your finances. 100% offline and secure.',
-            icon: Sparkles
+            icon: require('../../assets/icon.png'),
+            isImage: true
         },
         {
             title: 'Material You Design',
             desc: 'A clean, adaptive interface inspired by Google Pixel design language.',
-            icon: Shield
+            icon: Shield,
+            isImage: false
         },
         {
             title: 'Secure by Default',
             desc: 'Your financial data is encrypted and never leaves your device.',
-            icon: Lock
+            icon: Lock,
+            isImage: false
         }
     ];
 
@@ -53,22 +57,35 @@ const Onboarding = ({ onFinish, onSetPasscode }: { onFinish: () => void, onSetPa
         );
     }
 
-    const Icon = steps[step].icon;
+    const currentStep = steps[step];
+    const Icon = currentStep.icon;
 
     return (
         <View style={[styles.container, { backgroundColor: isDark ? '#141218' : '#FFFBFE' }]}>
-            <View style={styles.header}>
+            <View style={styles.bgAccents}>
+                <Animated.View entering={ZoomIn.delay(200).duration(2000)} style={[styles.bgCircle, { top: -50, left: -50, backgroundColor: isDark ? '#381E7220' : '#EADDFF60' }]} />
+                <Animated.View entering={ZoomIn.delay(400).duration(2000)} style={[styles.bgCircle, { bottom: -100, right: -100, backgroundColor: isDark ? '#381E7220' : '#EADDFF60' }]} />
+            </View>
+
+            <Animated.View entering={FadeInUp.delay(300).duration(800)} style={styles.header}>
                 <View style={[styles.iconBox, { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}>
-                    <Icon color={isDark ? '#D0BCFF' : '#6750A4'} size={64} />
+                    {currentStep.isImage ? (
+                        <Animated.Image
+                            source={Icon}
+                            style={{ width: 80, height: 80, borderRadius: 20 }}
+                        />
+                    ) : (
+                        <Icon color={isDark ? '#D0BCFF' : '#6750A4'} size={64} />
+                    )}
                 </View>
-            </View>
+            </Animated.View>
 
-            <View style={styles.textContainer}>
-                <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{steps[step].title}</Text>
-                <Text style={[styles.desc, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{steps[step].desc}</Text>
-            </View>
+            <Animated.View entering={FadeIn.delay(500).duration(1000)} style={styles.textContainer}>
+                <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{currentStep.title}</Text>
+                <Text style={[styles.desc, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{currentStep.desc}</Text>
+            </Animated.View>
 
-            <View style={styles.footer}>
+            <Animated.View entering={FadeInDown.delay(700).duration(800)} style={styles.footer}>
                 <View style={styles.dotContainer}>
                     {steps.map((_, i) => (
                         <View
@@ -94,7 +111,7 @@ const Onboarding = ({ onFinish, onSetPasscode }: { onFinish: () => void, onSetPa
                     </Text>
                     <ArrowRight color={isDark ? '#381E72' : '#FFFFFF'} size={24} />
                 </TouchableOpacity>
-            </View>
+            </Animated.View>
         </View>
     );
 };
@@ -157,6 +174,17 @@ const styles = StyleSheet.create({
     nextText: {
         fontSize: 18,
         fontWeight: '500',
+    },
+    bgAccents: {
+        ...StyleSheet.absoluteFillObject,
+        overflow: 'hidden',
+        zIndex: -1
+    },
+    bgCircle: {
+        position: 'absolute',
+        width: 300,
+        height: 300,
+        borderRadius: 150,
     }
 });
 

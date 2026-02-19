@@ -1,30 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Platform, Modal, TouchableWithoutFeedback, Keyboard, FlatList } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Platform, Modal, TouchableWithoutFeedback, Keyboard, FlatList, KeyboardAvoidingView } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Colors } from '../theme/colors';
+import { ColorPresets } from '../theme/colors';
 import Background from '../components/Background';
-import { X, Check, Target, FileText, ChevronRight, Plus, Trash2, Edit2, ShoppingCart, Coffee, Car, Home, Zap, Heart, Gift, Briefcase, DollarSign, Utensils, Smartphone, Globe } from 'lucide-react-native';
+import { X, Check, Target, ShoppingBag, Coffee, Car, Home, Zap, Heart, Gift, Briefcase, DollarSign, Utensils, Smartphone, Globe, Film, HeartPulse, Sparkles, Trash2, Edit2, Plus, FileText, ChevronRight, ShoppingCart } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { dbService } from '../database/db';
 import ModalAlert from '../components/ModalAlert';
+import { CATEGORY_ICONS } from '../utils/iconLibrary';
 
-const ICONS: any = {
-    shopping: ShoppingCart,
-    coffee: Coffee,
-    car: Car,
-    home: Home,
-    zap: Zap,
-    heart: Heart,
-    gift: Gift,
-    work: Briefcase,
-    money: DollarSign,
-    food: Utensils,
-    phone: Smartphone,
-    tag: Target,
-    globe: Globe
-};
 
-const AddTransaction = ({ navigation }: any) => {
+const AddTransaction = ({ navigation, route }: any) => {
+    const editTx = route.params?.transaction;
     const { colors, theme, currency } = useTheme();
     const [amount, setAmount] = useState('');
     const [note, setNote] = useState('');
@@ -53,12 +40,22 @@ const AddTransaction = ({ navigation }: any) => {
 
     useEffect(() => {
         loadCats();
-    }, []);
+        if (editTx) {
+            setAmount(editTx.amount.toString());
+            setNote(editTx.note || '');
+            setType(editTx.type);
+        }
+    }, [editTx]);
 
     const loadCats = async () => {
         const cats = await dbService.getCategories();
         setCategories(cats);
-        if (!category && cats.length > 0) setCategory(cats[0]);
+        if (editTx) {
+            const currentCat = cats.find((c: any) => c.id === editTx.category_id);
+            if (currentCat) setCategory(currentCat);
+        } else if (!category && cats.length > 0) {
+            setCategory(cats[0]);
+        }
     };
 
     const handleSave = async () => {
@@ -75,13 +72,19 @@ const AddTransaction = ({ navigation }: any) => {
 
         try {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => { });
-            await dbService.addTransaction({
+            const txData = {
                 type: type,
                 amount: parsedAmount,
                 category_id: category.id,
                 note: note.trim(),
-                date: new Date().toISOString()
-            });
+                date: editTx ? editTx.date : new Date().toISOString()
+            };
+
+            if (editTx) {
+                await dbService.updateTransaction(editTx.id, txData);
+            } else {
+                await dbService.addTransaction(txData);
+            }
             navigation.goBack();
         } catch (error) {
             console.error("Save error:", error);
@@ -155,15 +158,21 @@ const AddTransaction = ({ navigation }: any) => {
 
     return (
         <Background>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                <View style={[styles.container, { backgroundColor: isDark ? '#1C1B1F' : '#FFFBFE' }]}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
+                <View style={[styles.container, { backgroundColor: colors.background }]}>
                     <View style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
-                            <X color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
+                            <X color={colors.onSurface} size={24} />
                         </TouchableOpacity>
-                        <Text style={[styles.headerTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>New Flow</Text>
-                        <TouchableOpacity onPress={handleSave} style={[styles.saveFab, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
-                            <Check color={isDark ? '#381E72' : '#FFFFFF'} size={24} />
+                        <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
+                            {editTx ? 'Edit Flow' : 'Flow Stream'}
+                        </Text>
+                        <TouchableOpacity onPress={handleSave} style={[styles.saveFab, { backgroundColor: colors.primary }]}>
+                            <Check color={colors.onPrimary} size={24} />
                         </TouchableOpacity>
                     </View>
 
@@ -179,11 +188,11 @@ const AddTransaction = ({ navigation }: any) => {
                                     onPress={() => setType(t as any)}
                                     style={[
                                         styles.typeChip,
-                                        type === t && { backgroundColor: isDark ? '#D0BCFF' : '#6750A4', borderColor: isDark ? '#D0BCFF' : '#6750A4' },
-                                        { borderColor: isDark ? '#938F99' : '#79747E' }
+                                        type === t && { backgroundColor: colors.primary, borderColor: colors.primary },
+                                        { borderColor: colors.outline }
                                     ]}
                                 >
-                                    <Text style={[styles.typeChipText, { color: type === t ? (isDark ? '#381E72' : '#FFFFFF') : (isDark ? '#E6E1E5' : '#49454F') }]}>
+                                    <Text style={[styles.typeChipText, { color: type === t ? colors.onPrimary : colors.onSurfaceVariant }]}>
                                         {t.charAt(0).toUpperCase() + t.slice(1)}
                                     </Text>
                                 </TouchableOpacity>
@@ -191,13 +200,13 @@ const AddTransaction = ({ navigation }: any) => {
                         </View>
 
                         <View style={styles.inputCard}>
-                            <Text style={[styles.label, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Amount</Text>
+                            <Text style={[styles.label, { color: colors.primary }]}>Amount</Text>
                             <View style={styles.amountInputContainer}>
-                                <Text style={[styles.currency, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{symbol}</Text>
+                                <Text style={[styles.currency, { color: colors.onSurface }]}>{symbol}</Text>
                                 <TextInput
-                                    style={[styles.amountInput, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
+                                    style={[styles.amountInput, { color: colors.onSurface }]}
                                     placeholder="0"
-                                    placeholderTextColor={isDark ? '#49454F' : '#CAC4D0'}
+                                    placeholderTextColor={colors.onSurfaceVariant}
                                     keyboardType="decimal-pad"
                                     value={amount}
                                     onChangeText={setAmount}
@@ -207,14 +216,14 @@ const AddTransaction = ({ navigation }: any) => {
 
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
-                                <Text style={[styles.label, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Category</Text>
-                                <TouchableOpacity onPress={() => setShowCatModal(true)} style={[styles.addBtn, { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}>
-                                    <Plus color={isDark ? '#D0BCFF' : '#21005D'} size={18} />
+                                <Text style={[styles.label, { color: colors.primary }]}>Category</Text>
+                                <TouchableOpacity onPress={() => setShowCatModal(true)} style={[styles.addBtn, { backgroundColor: colors.primaryContainer }]}>
+                                    <Plus color={colors.primary} size={18} />
                                 </TouchableOpacity>
                             </View>
                             <View style={styles.categoryGrid}>
                                 {categories.map((cat) => {
-                                    const IconComp = ICONS[cat.icon] || ICONS.tag;
+                                    const IconComp = CATEGORY_ICONS[cat.icon] || CATEGORY_ICONS.tag;
                                     return (
                                         <TouchableOpacity
                                             key={cat.id}
@@ -222,25 +231,25 @@ const AddTransaction = ({ navigation }: any) => {
                                             onLongPress={() => openEditCat(cat)}
                                             style={[
                                                 styles.catChip,
-                                                category?.id === cat.id && { backgroundColor: isDark ? '#4F378B' : '#EADDFF', borderColor: isDark ? '#D0BCFF' : '#6750A4' },
-                                                { borderColor: isDark ? '#49454F' : '#E7E0EC' }
+                                                category?.id === cat.id && { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+                                                { borderColor: colors.outline }
                                             ]}
                                         >
                                             <IconComp size={16} color={cat.color} />
-                                            <Text style={[styles.catText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{cat.name}</Text>
+                                            <Text style={[styles.catText, { color: colors.onSurface }]}>{cat.name}</Text>
                                         </TouchableOpacity>
                                     );
                                 })}
                             </View>
-                            <Text style={[styles.hintTxt, { color: isDark ? '#938F99' : '#79747E' }]}>Long press category to edit or delete</Text>
+                            <Text style={[styles.hintTxt, { color: colors.onSurfaceVariant }]}>Long press category to edit or delete</Text>
                         </View>
 
                         <View style={styles.section}>
-                            <Text style={[styles.label, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Note</Text>
+                            <Text style={[styles.label, { color: colors.primary }]}>Note</Text>
                             <TextInput
-                                style={[styles.noteInput, { borderBottomColor: isDark ? '#938F99' : '#79747E', color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
+                                style={[styles.noteInput, { borderBottomColor: colors.outline, color: colors.onSurface }]}
                                 placeholder="What was this for?"
-                                placeholderTextColor={isDark ? '#49454F' : '#CAC4D0'}
+                                placeholderTextColor={colors.onSurfaceVariant}
                                 value={note}
                                 onChangeText={setNote}
                             />
@@ -251,29 +260,29 @@ const AddTransaction = ({ navigation }: any) => {
                     <Modal visible={showCatModal} transparent animationType="slide">
                         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                             <View style={styles.modalOverlay}>
-                                <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
+                                <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
                                     <View style={styles.modalHeaderRow}>
-                                        <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
+                                        <Text style={[styles.modalTitle, { color: colors.onSurface }]}>
                                             {isEditingCat ? 'Edit Category' : 'New Category'}
                                         </Text>
                                         {isEditingCat && (
                                             <TouchableOpacity onPress={() => handleDeleteCategory(editingCatId!)} style={styles.deleteBtn}>
-                                                <Trash2 color={isDark ? '#F2B8B5' : '#B3261E'} size={20} />
+                                                <Trash2 color={colors.error || '#B3261E'} size={20} />
                                             </TouchableOpacity>
                                         )}
                                     </View>
 
                                     <View style={styles.catInputRow}>
                                         <TouchableOpacity
-                                            style={[styles.iconSelect, { backgroundColor: isDark ? '#1D1B20' : '#F3EDF7' }]}
+                                            style={[styles.iconSelect, { backgroundColor: colors.card }]}
                                             onPress={() => setShowIconPicker(true)}
                                         >
-                                            {React.createElement(ICONS[newCatIcon] || ICONS.tag, { size: 24, color: isDark ? '#D0BCFF' : '#6750A4' })}
+                                            {React.createElement(CATEGORY_ICONS[newCatIcon] || CATEGORY_ICONS.tag, { size: 24, color: colors.primary })}
                                         </TouchableOpacity>
                                         <TextInput
-                                            style={[styles.modalInput, { color: isDark ? '#E6E1E5' : '#1C1B1F', borderBottomColor: colors.primary, flex: 1 }]}
+                                            style={[styles.modalInput, { color: colors.onSurface, borderBottomColor: colors.primary, flex: 1 }]}
                                             placeholder="Category Name"
-                                            placeholderTextColor={isDark ? '#49454F' : '#CAC4D0'}
+                                            placeholderTextColor={colors.onSurfaceVariant}
                                             value={newCatName}
                                             onChangeText={setNewCatName}
                                         />
@@ -281,10 +290,10 @@ const AddTransaction = ({ navigation }: any) => {
 
                                     <View style={styles.modalActions}>
                                         <TouchableOpacity onPress={resetCatModal} style={styles.modalActionBtn}>
-                                            <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>Cancel</Text>
+                                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Cancel</Text>
                                         </TouchableOpacity>
                                         <TouchableOpacity onPress={handleSaveCategory} style={styles.modalActionBtn}>
-                                            <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>
+                                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
                                                 {isEditingCat ? 'Update' : 'Create'}
                                             </Text>
                                         </TouchableOpacity>
@@ -297,24 +306,29 @@ const AddTransaction = ({ navigation }: any) => {
                     {/* Icon Picker Modal */}
                     <Modal visible={showIconPicker} transparent animationType="fade">
                         <View style={styles.modalOverlay}>
-                            <View style={[styles.iconPickerCard, { backgroundColor: isDark ? '#242229' : '#FFFFFF' }]}>
-                                <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Pick Icon</Text>
-                                <View style={styles.iconGrid}>
-                                    {Object.keys(ICONS).map((key) => {
-                                        const IconComp = ICONS[key];
+                            <View style={[styles.iconPickerCard, { backgroundColor: colors.surface }]}>
+                                <View style={styles.modalHeaderRow}>
+                                    <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Pick Icon</Text>
+                                    <TouchableOpacity onPress={() => setShowIconPicker(false)}>
+                                        <X color={colors.onSurface} size={24} />
+                                    </TouchableOpacity>
+                                </View>
+                                <ScrollView contentContainerStyle={styles.iconGrid} showsVerticalScrollIndicator={false}>
+                                    {Object.keys(CATEGORY_ICONS).map((key) => {
+                                        const IconComp = CATEGORY_ICONS[key];
                                         return (
                                             <TouchableOpacity
                                                 key={key}
-                                                style={[styles.iconBox, newCatIcon === key && { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}
+                                                style={[styles.iconBox, { backgroundColor: colors.card }, newCatIcon === key && { backgroundColor: colors.primaryContainer }]}
                                                 onPress={() => { setNewCatIcon(key); setShowIconPicker(false); }}
                                             >
-                                                <IconComp size={24} color={isDark ? '#D0BCFF' : '#6750A4'} />
+                                                <IconComp size={24} color={newCatIcon === key ? colors.primary : colors.onSurfaceVariant} />
                                             </TouchableOpacity>
                                         );
                                     })}
-                                </View>
+                                </ScrollView>
                                 <TouchableOpacity style={styles.modalClose} onPress={() => setShowIconPicker(false)}>
-                                    <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>Close</Text>
+                                    <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Close</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
@@ -329,7 +343,7 @@ const AddTransaction = ({ navigation }: any) => {
                         onConfirm={alertConfig.onConfirm}
                     />
                 </View>
-            </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
         </Background>
     );
 };
@@ -367,10 +381,10 @@ const styles = StyleSheet.create({
     modalInput: { borderBottomWidth: 2, paddingVertical: 12, fontSize: 16 },
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
     modalActionBtn: { padding: 12 },
-    iconPickerCard: { borderRadius: 28, padding: 24, width: '90%', alignSelf: 'center' },
-    iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 24 },
-    iconBox: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    modalClose: { marginTop: 24, alignItems: 'center' }
+    iconPickerCard: { borderRadius: 28, padding: 24, width: '90%', maxHeight: '80%', alignSelf: 'center' },
+    iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
+    iconBox: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+    modalClose: { marginTop: 20, alignItems: 'center' }
 });
 
 export default AddTransaction;

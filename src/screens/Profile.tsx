@@ -1,15 +1,45 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Platform, Image, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Platform, Image, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
 import { Camera, Mail, Phone, MapPin, Edit2, LogOut, ChevronLeft, User, Shield, Bell, Check, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ModalAlert from '../components/ModalAlert';
 
 import * as ImagePicker from 'expo-image-picker';
 
+const EditField = ({ icon: Icon, label, value, field, colors, onChange }: any) => (
+    <View style={styles.editField}>
+        <View style={[styles.itemIcon, { backgroundColor: colors.card }]}>
+            <Icon size={20} color={colors.primary} />
+        </View>
+        <View style={styles.inputContainer}>
+            <Text style={[styles.inputLabel, { color: colors.primary }]}>{label}</Text>
+            <TextInput
+                style={[styles.input, { color: colors.onSurface, borderBottomColor: colors.outline }]}
+                value={value}
+                onChangeText={onChange}
+            />
+        </View>
+    </View>
+);
+
+const ProfileItem = ({ icon: Icon, label, value, colors }: any) => (
+    <View style={styles.item}>
+        <View style={[styles.itemIcon, { backgroundColor: colors.card }]}>
+            <Icon size={20} color={colors.primary} />
+        </View>
+        <View style={styles.itemContent}>
+            <Text style={[styles.itemLabel, { color: colors.onSurfaceVariant }]}>{label}</Text>
+            <Text style={[styles.itemValue, { color: colors.onSurface }]}>{value}</Text>
+        </View>
+    </View>
+);
+
 const Profile = ({ navigation }: any) => {
-    const { theme } = useTheme();
+    const { theme, colors } = useTheme();
+
     const isDark = theme === 'dark';
 
     const [isEditing, setIsEditing] = useState(false);
@@ -23,7 +53,12 @@ const Profile = ({ navigation }: any) => {
 
     const [tempUser, setTempUser] = useState({ ...user });
     const [stats, setStats] = useState({ categories: 0, transactions: 0 });
-    const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'info' });
+    const [alertConfig, setAlertConfig] = useState<{ visible: boolean; title: string; message: string; type: 'info' | 'error' | 'success' | 'confirm' }>({
+        visible: false,
+        title: '',
+        message: '',
+        type: 'info'
+    });
 
     useEffect(() => {
         loadProfile();
@@ -58,7 +93,12 @@ const Profile = ({ navigation }: any) => {
     const handlePickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-            alert('Sorry, we need camera roll permissions to make this work!');
+            setAlertConfig({
+                visible: true,
+                title: 'Permission Required',
+                message: 'Budgeto needs access to your gallery to change your profile picture.',
+                type: 'error'
+            });
             return;
         }
 
@@ -90,112 +130,116 @@ const Profile = ({ navigation }: any) => {
         }
     };
 
-    const EditField = ({ icon: Icon, label, value, field }: any) => (
-        <View style={styles.editField}>
-            <View style={[styles.itemIcon, { backgroundColor: isDark ? '#1D1B20' : '#F3EDF7' }]}>
-                <Icon size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />
-            </View>
-            <View style={styles.inputContainer}>
-                <Text style={[styles.inputLabel, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>{label}</Text>
-                <TextInput
-                    style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F', borderBottomColor: isDark ? '#49454F' : '#E7E0EC' }]}
-                    value={value}
-                    onChangeText={(text) => {
-                        setTempUser(prev => ({ ...prev, [field]: text }));
-                    }}
-                />
-            </View>
-        </View>
-    );
 
-    const ProfileItem = ({ icon: Icon, label, value }: any) => (
-        <View style={styles.item}>
-            <View style={[styles.itemIcon, { backgroundColor: isDark ? '#2B2930' : '#F3EDF7' }]}>
-                <Icon size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />
-            </View>
-            <View style={styles.itemContent}>
-                <Text style={[styles.itemLabel, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{label}</Text>
-                <Text style={[styles.itemValue, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{value}</Text>
-            </View>
-        </View>
-    );
 
     return (
         <Background>
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={{ flex: 1 }}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            >
                 <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
                     <View style={styles.header}>
                         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                            <ChevronLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
+                            <ChevronLeft color={colors.onSurface} size={24} />
                         </TouchableOpacity>
-                        <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
+                        <Text style={[styles.title, { color: colors.onSurface }]}>
                             {isEditing ? 'System Identity' : 'My Core'}
                         </Text>
                         {isEditing ? (
                             <TouchableOpacity onPress={handleSave}>
-                                <Check color={isDark ? '#D0BCFF' : '#6750A4'} size={24} />
+                                <Check color={colors.primary} size={24} />
                             </TouchableOpacity>
                         ) : (
                             <TouchableOpacity onPress={() => setIsEditing(true)}>
-                                <Edit2 color={isDark ? '#E6E1E5' : '#1C1B1F'} size={20} />
+                                <Edit2 color={colors.onSurface} size={20} />
                             </TouchableOpacity>
                         )}
                     </View>
 
                     <View style={styles.avatarSection}>
-                        <TouchableOpacity onPress={handlePickImage} style={[styles.avatarContainer, { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}>
+                        <TouchableOpacity onPress={handlePickImage} style={[styles.avatarContainer, { backgroundColor: colors.primaryContainer }]}>
                             {tempUser.avatar ? (
                                 <Image source={{ uri: isEditing ? tempUser.avatar : user.avatar }} style={styles.avatarImage} />
                             ) : (
-                                <Text style={[styles.avatarInitial, { color: isDark ? '#D0BCFF' : '#21005D' }]}>
+                                <Text style={[styles.avatarInitial, { color: colors.onPrimary }]}>
                                     {user.name.split(' ').map(n => n[0]).join('')}
                                 </Text>
                             )}
-                            <View style={[styles.cameraBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
-                                <Camera size={16} color={isDark ? '#381E72' : '#FFFFFF'} />
+                            <View style={[styles.cameraBtn, { backgroundColor: colors.primary }]}>
+                                <Camera size={16} color={colors.onPrimary} />
                             </View>
                         </TouchableOpacity>
                         {!isEditing && (
                             <>
-                                <Text style={[styles.userName, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{user.name}</Text>
-                                <Text style={[styles.userEmail, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{user.email}</Text>
+                                <Text style={[styles.userName, { color: colors.onSurface }]}>{user.name}</Text>
+                                <Text style={[styles.userEmail, { color: colors.onSurfaceVariant }]}>{user.email}</Text>
                             </>
                         )}
                     </View>
 
                     {isEditing ? (
                         <View style={styles.editSection}>
-                            <EditField icon={User} label="Identity Node" value={tempUser.name} field="name" />
-                            <EditField icon={Mail} label="Comms Channel" value={tempUser.email} field="email" />
-                            <EditField icon={Phone} label="Secure Line" value={tempUser.phone} field="phone" />
-                            <EditField icon={MapPin} label="Active Location" value={tempUser.location} field="location" />
+                            <EditField
+                                icon={User}
+                                label="Identity Node"
+                                value={tempUser.name}
+                                field="name"
+                                colors={colors}
+                                onChange={(text: string) => setTempUser(prev => ({ ...prev, name: text }))}
+                            />
+                            <EditField
+                                icon={Mail}
+                                label="Comms Channel"
+                                value={tempUser.email}
+                                field="email"
+                                colors={colors}
+                                onChange={(text: string) => setTempUser(prev => ({ ...prev, email: text }))}
+                            />
+                            <EditField
+                                icon={Phone}
+                                label="Secure Line"
+                                value={tempUser.phone}
+                                field="phone"
+                                colors={colors}
+                                onChange={(text: string) => setTempUser(prev => ({ ...prev, phone: text }))}
+                            />
+                            <EditField
+                                icon={MapPin}
+                                label="Active Location"
+                                value={tempUser.location}
+                                field="location"
+                                colors={colors}
+                                onChange={(text: string) => setTempUser(prev => ({ ...prev, location: text }))}
+                            />
 
                             <TouchableOpacity
-                                style={[styles.cancelBtn, { borderColor: isDark ? '#49454F' : '#E7E0EC' }]}
+                                style={[styles.cancelBtn, { borderColor: colors.outline }]}
                                 onPress={() => { setIsEditing(false); setTempUser(user); }}
                             >
-                                <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontWeight: 'bold' }}>Abort Changes</Text>
+                                <Text style={{ color: colors.onSurface, fontWeight: 'bold' }}>Abort Changes</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
                         <>
-                            <View style={[styles.statsCard, { backgroundColor: isDark ? '#1D1B20' : '#F7F2FA' }]}>
+                            <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
                                 <View style={styles.statBox}>
-                                    <Text style={[styles.statValue, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>{stats.categories}</Text>
-                                    <Text style={[styles.statLabel, { color: isDark ? '#CAC4D0' : '#49454F' }]}>Nodes</Text>
+                                    <Text style={[styles.statValue, { color: colors.primary }]}>{stats.categories}</Text>
+                                    <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>Nodes</Text>
                                 </View>
-                                <View style={[styles.statDivider, { backgroundColor: isDark ? '#49454F' : '#E7E0EC' }]} />
+                                <View style={[styles.statDivider, { backgroundColor: colors.outline }]} />
                                 <View style={styles.statBox}>
-                                    <Text style={[styles.statValue, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>{stats.transactions}</Text>
-                                    <Text style={[styles.statLabel, { color: isDark ? '#CAC4D0' : '#49454F' }]}>Flows</Text>
+                                    <Text style={[styles.statValue, { color: colors.primary }]}>{stats.transactions}</Text>
+                                    <Text style={[styles.statLabel, { color: colors.onSurfaceVariant }]}>Flows</Text>
                                 </View>
                             </View>
 
                             <View style={styles.section}>
-                                <Text style={[styles.sectionTitle, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Node Integrity</Text>
-                                <ProfileItem icon={Mail} label="Comms" value={user.email} />
-                                <ProfileItem icon={Phone} label="Secure" value={user.phone} />
-                                <ProfileItem icon={MapPin} label="Zone" value={user.location} />
+                                <Text style={[styles.sectionTitle, { color: colors.primary }]}>Node Integrity</Text>
+                                <ProfileItem icon={Mail} label="Comms" value={user.email} colors={colors} />
+                                <ProfileItem icon={Phone} label="Secure" value={user.phone} colors={colors} />
+                                <ProfileItem icon={MapPin} label="Zone" value={user.location} colors={colors} />
                             </View>
                         </>
                     )}
@@ -208,7 +252,15 @@ const Profile = ({ navigation }: any) => {
                         <Text style={[styles.logoutText, { color: isDark ? '#F2B8B5' : '#B3261E' }]}>Disconnect</Text>
                     </TouchableOpacity>
                 </ScrollView>
-            </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+
+            <ModalAlert
+                visible={alertConfig.visible}
+                title={alertConfig.title}
+                message={alertConfig.message}
+                type={alertConfig.type}
+                onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+            />
         </Background>
     );
 };

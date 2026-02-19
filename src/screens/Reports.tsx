@@ -8,6 +8,7 @@ import { Sparkles, ArrowLeft, TrendingUp, Filter, Calendar as CalIcon, ChevronDo
 import Background from '../components/Background';
 import GlassCard from '../components/GlassCard';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth, subMonths, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
@@ -227,13 +228,14 @@ const Reports = ({ navigation }: any) => {
                             <PieChart
                                 data={pieData}
                                 donut
-                                radius={width * 0.22}
-                                innerRadius={width * 0.16}
-                                innerCircleColor={'transparent'}
+                                radius={width * 0.28}
+                                innerRadius={width * 0.22}
+                                innerCircleColor={isDark ? '#1C1B1F' : '#FFFFFF'}
                                 centerLabelComponent={() => (
                                     <View style={{ alignItems: 'center' }}>
-                                        <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontSize: 20, fontWeight: '700' }}>
-                                            {symbol}{totalValue > 999 ? (totalValue / 1000).toFixed(1) + 'k' : totalValue.toFixed(0)}
+                                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 12, fontWeight: '500' }}>Total</Text>
+                                        <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontSize: 24, fontWeight: '700' }}>
+                                            {symbol}{totalValue > 9999 ? (totalValue / 1000).toFixed(1) + 'k' : totalValue.toLocaleString()}
                                         </Text>
                                     </View>
                                 )}
@@ -243,11 +245,24 @@ const Reports = ({ navigation }: any) => {
                             {pieData.map((d, i) => (
                                 <View key={i} style={styles.legendRow}>
                                     <View style={[styles.dot, { backgroundColor: d.color }]} />
-                                    <Text style={[styles.legendText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{d.label}</Text>
-                                    <View style={styles.legendValueBox}>
-                                        <Text style={[styles.legendValue, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
-                                            {totalValue > 0 ? ((d.value / totalValue) * 100).toFixed(0) : 0}%
-                                        </Text>
+                                    <View style={{ flex: 1 }}>
+                                        <View style={styles.legendTopRow}>
+                                            <Text style={[styles.legendText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{d.label}</Text>
+                                            <Text style={[styles.legendValue, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
+                                                {symbol}{d.value.toLocaleString()}
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.progressBarContainer, { backgroundColor: isDark ? '#2B2930' : '#F3EDF7' }]}>
+                                            <View
+                                                style={[
+                                                    styles.progressBar,
+                                                    {
+                                                        backgroundColor: d.color,
+                                                        width: `${totalValue > 0 ? (d.value / totalValue * 100) : 0}%`
+                                                    }
+                                                ]}
+                                            />
+                                        </View>
                                     </View>
                                 </View>
                             ))}
@@ -260,16 +275,17 @@ const Reports = ({ navigation }: any) => {
                     <GlassCard style={styles.chartWrapper}>
                         <BarChart
                             data={barData}
-                            barWidth={24}
-                            spacing={20}
-                            noOfSections={3}
-                            barBorderRadius={8}
+                            barWidth={width / (barData.length > 7 ? barData.length * 1.8 : 10)}
+                            spacing={barData.length > 7 ? 12 : 24}
+                            noOfSections={4}
+                            barBorderRadius={12}
                             yAxisThickness={0}
                             xAxisThickness={0}
                             hideRules
-                            hideYAxisText
                             yAxisTextStyle={{ color: isDark ? '#938F99' : '#79747E', fontSize: 10 }}
-                            xAxisLabelTextStyle={{ color: isDark ? '#938F99' : '#79747E', fontSize: 10, fontWeight: '700' }}
+                            xAxisLabelTextStyle={{ color: isDark ? '#938F99' : '#79747E', fontSize: 10, fontWeight: '600' }}
+                            animationDuration={800}
+                            isAnimated
                         />
                     </GlassCard>
                 </View>
@@ -314,12 +330,15 @@ const styles = StyleSheet.create({
     sectionTitle: { fontSize: 18, fontWeight: '500', marginBottom: 16, marginLeft: 4 },
     chartWrapper: { padding: 24, alignItems: 'center' },
     pieContainer: { alignItems: 'center', marginBottom: 28 },
-    legend: { width: '100%', gap: 12 },
-    legendRow: { flexDirection: 'row', alignItems: 'center' },
-    dot: { width: 10, height: 10, borderRadius: 5, marginRight: 12 },
-    legendText: { fontSize: 14, flex: 1, fontWeight: '400' },
+    legend: { width: '100%', gap: 20 },
+    legendRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    dot: { width: 12, height: 12, borderRadius: 6 },
+    legendTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    legendText: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3 },
+    legendValue: { fontSize: 14, fontWeight: '700' },
+    progressBarContainer: { height: 6, borderRadius: 3, overflow: 'hidden' },
+    progressBar: { height: '100%', borderRadius: 3 },
     legendValueBox: { backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
-    legendValue: { fontSize: 13, fontWeight: '700' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, elevation: 12 },
     modalTitle: { fontSize: 20, fontWeight: '600', marginBottom: 24 },

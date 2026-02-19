@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Modal, FlatList, TouchableWithoutFeedback, Keyboard } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Modal, FlatList, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import Animated, { FadeInDown, FadeInUp, Layout, FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
 import { ChevronLeft, Plus, Trash2, Check, User, DollarSign, Calendar, TrendingUp, TrendingDown, Clock } from 'lucide-react-native';
@@ -81,7 +82,7 @@ const DebtScreen = ({ navigation }: any) => {
     const totalOwedToMe = debts.filter(d => d.type === 'owed_to_me' && d.status === 'pending').reduce((acc, d) => acc + d.amount, 0);
     const totalIOwe = debts.filter(d => d.type === 'i_owe' && d.status === 'pending').reduce((acc, d) => acc + d.amount, 0);
 
-    const renderItem = ({ item }: { item: any }) => (
+    const renderItem = ({ item, index }: { item: any, index: number }) => (
         <View style={[styles.debtCard, { backgroundColor: isDark ? '#1D1B20' : '#F7F2FA' }, item.status === 'settled' && { opacity: 0.6 }]}>
             <View style={[styles.statusIndicator, { backgroundColor: item.type === 'owed_to_me' ? '#146C2E' : '#B3261E' }]} />
             <View style={styles.cardContent}>
@@ -136,90 +137,93 @@ const DebtScreen = ({ navigation }: any) => {
                     </View>
                 </View>
 
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                    <FlatList
-                        data={debts}
-                        renderItem={renderItem}
-                        keyExtractor={item => item.id.toString()}
-                        contentContainerStyle={styles.list}
-                        showsVerticalScrollIndicator={false}
-                        ListEmptyComponent={
-                            <View style={styles.empty}>
-                                <User color={isDark ? '#49454F' : '#CAC4D0'} size={64} strokeWidth={1} />
-                                <Text style={[styles.emptyText, { color: isDark ? '#CAC4D0' : '#49454F' }]}>No debt balance recorded</Text>
-                            </View>
-                        }
-                    />
-                </TouchableWithoutFeedback>
+                <FlatList
+                    data={debts}
+                    renderItem={renderItem}
+                    keyExtractor={item => item.id.toString()}
+                    contentContainerStyle={styles.list}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.empty}>
+                            <User color={isDark ? '#49454F' : '#CAC4D0'} size={64} strokeWidth={1} />
+                            <Text style={[styles.emptyText, { color: isDark ? '#CAC4D0' : '#49454F' }]}>No debt balance recorded</Text>
+                        </View>
+                    }
+                />
 
                 <Modal visible={showAddModal} transparent animationType="slide">
-                    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                        <View style={styles.modalOverlay}>
-                            <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
-                                <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Record Debt</Text>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={{ flex: 1 }}
+                    >
+                        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+                            <View style={styles.modalOverlay}>
+                                <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
+                                    <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Record Debt</Text>
 
-                                <View style={styles.typeToggle}>
-                                    <TouchableOpacity
-                                        style={[styles.toggleBtn, newDebt.type === 'owed_to_me' && { backgroundColor: '#146C2E' }]}
-                                        onPress={() => setNewDebt({ ...newDebt, type: 'owed_to_me' })}
-                                    >
-                                        <Text style={[styles.toggleText, { color: newDebt.type === 'owed_to_me' ? '#FFFFFF' : '#146C2E' }]}>Owed to me</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity
-                                        style={[styles.toggleBtn, newDebt.type === 'i_owe' && { backgroundColor: '#B3261E' }]}
-                                        onPress={() => setNewDebt({ ...newDebt, type: 'i_owe' })}
-                                    >
-                                        <Text style={[styles.toggleText, { color: newDebt.type === 'i_owe' ? '#FFFFFF' : '#B3261E' }]}>I owe</Text>
-                                    </TouchableOpacity>
-                                </View>
+                                    <View style={styles.typeToggle}>
+                                        <TouchableOpacity
+                                            style={[styles.toggleBtn, newDebt.type === 'owed_to_me' && { backgroundColor: '#146C2E' }]}
+                                            onPress={() => setNewDebt({ ...newDebt, type: 'owed_to_me' })}
+                                        >
+                                            <Text style={[styles.toggleText, { color: newDebt.type === 'owed_to_me' ? '#FFFFFF' : '#146C2E' }]}>Owed to me</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            style={[styles.toggleBtn, newDebt.type === 'i_owe' && { backgroundColor: '#B3261E' }]}
+                                            onPress={() => setNewDebt({ ...newDebt, type: 'i_owe' })}
+                                        >
+                                            <Text style={[styles.toggleText, { color: newDebt.type === 'i_owe' ? '#FFFFFF' : '#B3261E' }]}>I owe</Text>
+                                        </TouchableOpacity>
+                                    </View>
 
-                                <View style={styles.inputGroup}>
-                                    <User size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />
-                                    <TextInput
-                                        style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
-                                        placeholder="Person / Entity"
-                                        placeholderTextColor={isDark ? '#938F99' : '#79747E'}
-                                        value={newDebt.person}
-                                        onChangeText={text => setNewDebt({ ...newDebt, person: text })}
-                                    />
-                                </View>
+                                    <View style={styles.inputGroup}>
+                                        <User size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />
+                                        <TextInput
+                                            style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
+                                            placeholder="Person / Entity"
+                                            placeholderTextColor={isDark ? '#938F99' : '#79747E'}
+                                            value={newDebt.person}
+                                            onChangeText={text => setNewDebt({ ...newDebt, person: text })}
+                                        />
+                                    </View>
 
-                                <View style={styles.inputGroup}>
-                                    <Text style={{ fontSize: 20, color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>{symbol}</Text>
-                                    <TextInput
-                                        style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
-                                        placeholder="Amount"
-                                        placeholderTextColor={isDark ? '#938F99' : '#79747E'}
-                                        keyboardType="decimal-pad"
-                                        value={newDebt.amount}
-                                        onChangeText={text => setNewDebt({ ...newDebt, amount: text })}
-                                    />
-                                </View>
+                                    <View style={styles.inputGroup}>
+                                        <Text style={{ fontSize: 20, color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>{symbol}</Text>
+                                        <TextInput
+                                            style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}
+                                            placeholder="Amount"
+                                            placeholderTextColor={isDark ? '#938F99' : '#79747E'}
+                                            keyboardType="decimal-pad"
+                                            value={newDebt.amount}
+                                            onChangeText={text => setNewDebt({ ...newDebt, amount: text })}
+                                        />
+                                    </View>
 
-                                <View style={[styles.inputGroup, { alignItems: 'flex-start' }]}>
-                                    <Clock size={20} color={isDark ? '#D0BCFF' : '#6750A4'} style={{ marginTop: 12 }} />
-                                    <TextInput
-                                        style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F', textAlignVertical: 'top' }]}
-                                        placeholder="Note / Reason"
-                                        placeholderTextColor={isDark ? '#938F99' : '#79747E'}
-                                        multiline
-                                        numberOfLines={3}
-                                        value={newDebt.note}
-                                        onChangeText={text => setNewDebt({ ...newDebt, note: text })}
-                                    />
-                                </View>
+                                    <View style={[styles.inputGroup, { alignItems: 'flex-start' }]}>
+                                        <Clock size={20} color={isDark ? '#D0BCFF' : '#6750A4'} style={{ marginTop: 12 }} />
+                                        <TextInput
+                                            style={[styles.input, { color: isDark ? '#E6E1E5' : '#1C1B1F', textAlignVertical: 'top' }]}
+                                            placeholder="Note / Reason"
+                                            placeholderTextColor={isDark ? '#938F99' : '#79747E'}
+                                            multiline
+                                            numberOfLines={3}
+                                            value={newDebt.note}
+                                            onChangeText={text => setNewDebt({ ...newDebt, note: text })}
+                                        />
+                                    </View>
 
-                                <View style={styles.modalActions}>
-                                    <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.cancelBtn}>
-                                        <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontWeight: 'bold' }}>Cancel</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={handleAddDebt} style={[styles.confirmBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
-                                        <Text style={{ color: isDark ? '#381E72' : '#FFFFFF', fontWeight: 'bold' }}>Save Record</Text>
-                                    </TouchableOpacity>
+                                    <View style={styles.modalActions}>
+                                        <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.cancelBtn}>
+                                            <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontWeight: 'bold' }}>Cancel</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={handleAddDebt} style={[styles.confirmBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
+                                            <Text style={{ color: isDark ? '#381E72' : '#FFFFFF', fontWeight: 'bold' }}>Save Record</Text>
+                                        </TouchableOpacity>
+                                    </View>
                                 </View>
                             </View>
-                        </View>
-                    </TouchableWithoutFeedback>
+                        </TouchableWithoutFeedback>
+                    </KeyboardAvoidingView>
                 </Modal>
 
                 <ModalAlert

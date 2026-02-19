@@ -2,12 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Modal } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
-import { Lock, Delete, XCircle } from 'lucide-react-native';
+import { Lock, Delete, XCircle, ChevronLeft, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
-const PasscodeScreen = ({ onComplete, title = "Enter Passcode" }: { onComplete: (code: string) => void, title?: string }) => {
+const PasscodeScreen = ({ onComplete, navigation, title = "Enter Passcode" }: { onComplete: (code: string) => void, navigation?: any, title?: string }) => {
     const { theme } = useTheme();
     const [code, setCode] = useState('');
     const [errorModal, setErrorModal] = useState(false);
@@ -44,6 +44,14 @@ const PasscodeScreen = ({ onComplete, title = "Enter Passcode" }: { onComplete: 
     return (
         <Background>
             <View style={styles.container}>
+                {navigation && (
+                    <TouchableOpacity
+                        style={styles.backBtn}
+                        onPress={() => navigation.goBack()}
+                    >
+                        <ChevronLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={28} />
+                    </TouchableOpacity>
+                )}
                 <View style={styles.header}>
                     <View style={[styles.iconBox, { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}>
                         <Lock color={isDark ? '#D0BCFF' : '#6750A4'} size={32} />
@@ -73,19 +81,30 @@ const PasscodeScreen = ({ onComplete, title = "Enter Passcode" }: { onComplete: 
                         <TouchableOpacity
                             key={i}
                             style={styles.key}
-                            onPress={() => key === '⌫' ? handleDelete() : key !== '' && handlePress(key)}
-                            disabled={key === ''}
+                            onPress={() => {
+                                if (key === '⌫') {
+                                    if (code === '') {
+                                        if (navigation) navigation.goBack();
+                                    } else {
+                                        handleDelete();
+                                    }
+                                }
+                                else if (key !== '') handlePress(key);
+                            }}
                             activeOpacity={0.7}
+                            disabled={key === ''}
                         >
-                            {key === '' ? null : (
-                                <View style={[styles.keyInner, { backgroundColor: isDark ? '#1D1B20' : '#F7F2FA' }]}>
-                                    {key === '⌫' ? (
-                                        <Delete color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
+                            <View style={[styles.keyInner, { backgroundColor: isDark ? '#1D1B20' : '#F7F2FA' }]}>
+                                {key === '⌫' ? (
+                                    code === '' ? (
+                                        <Text style={[styles.cancelText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Cancel</Text>
                                     ) : (
-                                        <Text style={[styles.keyText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{key}</Text>
-                                    )}
-                                </View>
-                            )}
+                                        <Delete color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
+                                    )
+                                ) : (
+                                    <Text style={[styles.keyText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{key}</Text>
+                                )}
+                            </View>
                         </TouchableOpacity>
                     ))}
                 </View>
@@ -99,7 +118,13 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingTop: 60,
+    },
+    backBtn: {
+        position: 'absolute',
+        top: 60,
+        left: 24,
+        zIndex: 10,
+        padding: 8,
     },
     header: {
         alignItems: 'center',
@@ -151,6 +176,10 @@ const styles = StyleSheet.create({
     keyText: {
         fontSize: 28,
         fontWeight: '400',
+    },
+    cancelText: {
+        fontSize: 14,
+        fontWeight: '500',
     }
 });
 

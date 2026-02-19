@@ -34,8 +34,12 @@ class DatabaseService {
     const cats = [
       { id: 1, name: 'Dining & Food', icon: 'utensils', color: '#6366F1', budget: 600 },
       { id: 2, name: 'Fuel & Transit', icon: 'car', color: '#22D3EE', budget: 250 },
-      { id: 3, name: 'Gadgets & Tech', icon: 'cpu', color: '#F472B6', budget: 400 },
-      { id: 4, name: 'Paycheck', icon: 'banknote', color: '#34D399', budget: 0 }
+      { id: 3, name: 'Shopping', icon: 'shopping-bag', color: '#F472B6', budget: 400 },
+      { id: 4, name: 'Entertainment', icon: 'film', color: '#8B5CF6', budget: 200 },
+      { id: 5, name: 'Health', icon: 'heart-pulse', color: '#EF4444', budget: 150 },
+      { id: 6, name: 'Bills & Utilities', icon: 'zap', color: '#F59E0B', budget: 300 },
+      { id: 7, name: 'Salary', icon: 'briefcase', color: '#10B981', budget: 0 },
+      { id: 8, name: 'Personal Care', icon: 'sparkles', color: '#EC4899', budget: 100 }
     ];
     const txs = [
       { id: 101, type: 'income', amount: 4500, category_id: 4, note: 'Freelance Payout', date: new Date().toISOString() },
@@ -115,13 +119,17 @@ class DatabaseService {
     if (this.isWeb) {
       const txs = JSON.parse(localStorage.getItem('antigravity_transactions') || '[]');
       const cats = await this.getCategories();
-      return txs.map((t: any) => ({
-        ...t,
-        category_name: cats.find((c: any) => c.id === t.category_id)?.name,
-        category_color: cats.find((c: any) => c.id === t.category_id)?.color
-      }));
+      return txs.map((t: any) => {
+        const cat = cats.find((c: any) => c.id === t.category_id);
+        return {
+          ...t,
+          category_name: cat?.name,
+          category_color: cat?.color,
+          icon: cat?.icon
+        };
+      });
     }
-    return await this.dbNative.getAllAsync('SELECT t.*, c.name as category_name, c.color as category_color FROM transactions t LEFT JOIN categories c ON t.category_id = c.id ORDER BY date DESC');
+    return await this.dbNative.getAllAsync('SELECT t.*, c.name as category_name, c.color as category_color, c.icon as icon FROM transactions t LEFT JOIN categories c ON t.category_id = c.id ORDER BY date DESC');
   }
 
   async addTransaction(tx: any) {

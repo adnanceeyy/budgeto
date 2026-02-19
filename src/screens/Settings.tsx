@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch, TouchableOpacity, ScrollView, Platform, Modal } from 'react-native';
+import { StyleSheet, View, Text, Switch, TouchableOpacity, ScrollView, Platform, Modal, Image } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
-import { Colors } from '../theme/colors';
+import { ColorThemeType, BaseThemeColors } from '../theme/colors';
 import Background from '../components/Background';
-import { ChevronRight, Shield, Database, Palette, Info, Moon, Sun, Trash2, Key, Bell, Phone, Check, Globe } from 'lucide-react-native';
+import { ChevronRight, Shield, Database, Palette, Info, Moon, Sun, Trash2, Key, Bell, Phone, Check, Globe, Sparkles } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { dbService } from '../database/db';
 import { useNavigation } from '@react-navigation/native';
 import ModalAlert from '../components/ModalAlert';
 
 const Settings = () => {
-    const { theme, setTheme, currency, setCurrency } = useTheme();
+    const { theme, setTheme, colorTheme, setColorTheme, colors, currency, setCurrency } = useTheme();
     const isDark = theme === 'dark';
     const navigation = useNavigation<any>();
 
@@ -35,6 +35,13 @@ const Settings = () => {
     const themes = [
         { id: 'light', name: 'Light Flow', icon: Sun },
         { id: 'dark', name: 'Deep Space', icon: Moon }
+    ];
+
+    const colorPresets = [
+        { id: 'purple', name: 'Royal Purple', color: BaseThemeColors.purple },
+        { id: 'ocean', name: 'Ocean Breeze', color: BaseThemeColors.ocean },
+        { id: 'emerald', name: 'Emerald City', color: BaseThemeColors.emerald },
+        { id: 'crimson', name: 'Crimson Tide', color: BaseThemeColors.crimson }
     ];
 
     const handleWipeRequest = () => {
@@ -85,13 +92,19 @@ const Settings = () => {
                 <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Settings</Text>
 
                 <View style={styles.section}>
-                    <Text style={[styles.sectionHeader, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Appearance</Text>
+                    <Text style={[styles.sectionHeader, { color: colors.primary }]}>Appearance</Text>
                     <SettingItem
                         icon={isDark ? Moon : Sun}
                         title="App Theme"
                         subtitle="Change the visual style"
                         value={isDark ? 'Deep Space' : 'Light Flow'}
                         onPress={() => setShowThemeModal(true)}
+                    />
+                    <SettingItem
+                        icon={Palette}
+                        title="Manage Categories"
+                        subtitle="Customize icons and colors"
+                        onPress={() => navigation.navigate('ManageCategories')}
                     />
                     <SettingItem
                         icon={Globe}
@@ -103,7 +116,7 @@ const Settings = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={[styles.sectionHeader, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Security & Privacy</Text>
+                    <Text style={[styles.sectionHeader, { color: colors.primary }]}>Security & Privacy</Text>
                     <SettingItem
                         icon={Key}
                         title="Change Passcode"
@@ -124,7 +137,7 @@ const Settings = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={[styles.sectionHeader, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>General</Text>
+                    <Text style={[styles.sectionHeader, { color: colors.primary }]}>General</Text>
                     <SettingItem
                         icon={Bell}
                         title="Notifications"
@@ -140,7 +153,7 @@ const Settings = () => {
                 </View>
 
                 <View style={styles.section}>
-                    <Text style={[styles.sectionHeader, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>Danger Zone</Text>
+                    <Text style={[styles.sectionHeader, { color: colors.primary }]}>Danger Zone</Text>
                     <SettingItem
                         icon={Trash2}
                         title="Wipe Data"
@@ -149,26 +162,58 @@ const Settings = () => {
                         danger
                     />
                 </View>
+                <View style={styles.aboutSection}>
+                    <View style={[styles.aboutLogoContainer, { backgroundColor: colors.card }]}>
+                        <Image
+                            source={require('../../assets/icon.png')}
+                            style={styles.aboutLogo}
+                        />
+                    </View>
+                    <Text style={[styles.aboutTitle, { color: colors.onSurface }]}>Budgeto Hub</Text>
+                    <Text style={[styles.aboutVersion, { color: colors.onSurfaceVariant }]}>Stable Release V2.2.0</Text>
+                    <View style={[styles.proBadge, { backgroundColor: colors.primary + '20' }]}>
+                        <Sparkles size={14} color={colors.primary} />
+                        <Text style={[styles.proBadgeText, { color: colors.primary }]}>PREMIUM SYSTEM</Text>
+                    </View>
+                    <Text style={[styles.aboutCopyright, { color: colors.onSurfaceVariant }]}>
+                        &copy; 2024 Budgeto. Open Source. Private. Secure.
+                    </Text>
+                </View>
             </ScrollView>
 
             {/* Theme Modal */}
             <Modal visible={showThemeModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
-                        <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Select Theme</Text>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Select Theme</Text>
                         {themes.map((t) => (
                             <TouchableOpacity
                                 key={t.id}
-                                style={[styles.selectBox, { borderBottomColor: isDark ? '#49454F' : '#E7E0EC' }]}
+                                style={[styles.selectBox, { borderBottomColor: colors.outline }]}
                                 onPress={() => { setTheme(t.id as any); setShowThemeModal(false); }}
                             >
-                                <t.icon size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />
-                                <Text style={[styles.selectText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{t.name}</Text>
-                                {(theme === t.id) && <Check color={isDark ? '#D0BCFF' : '#6750A4'} size={20} />}
+                                <t.icon size={20} color={colors.primary} />
+                                <Text style={[styles.selectText, { color: colors.onSurface }]}>{t.name}</Text>
+                                {(theme === t.id) && <Check color={colors.primary} size={20} />}
                             </TouchableOpacity>
                         ))}
+                        <Text style={[styles.modalTitle, { color: colors.onSurface, marginTop: 24 }]}>Accent Color</Text>
+                        <View style={styles.colorGrid}>
+                            {colorPresets.map((p) => (
+                                <TouchableOpacity
+                                    key={p.id}
+                                    style={[
+                                        styles.colorCircle,
+                                        { backgroundColor: p.color },
+                                        colorTheme === p.id && { borderWidth: 3, borderColor: colors.onSurface }
+                                    ]}
+                                    onPress={() => setColorTheme(p.id as any)}
+                                />
+                            ))}
+                        </View>
+
                         <TouchableOpacity style={styles.modalClose} onPress={() => setShowThemeModal(false)}>
-                            <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>Cancel</Text>
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -177,28 +222,28 @@ const Settings = () => {
             {/* Currency Modal */}
             <Modal visible={showCurrencyModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
-                        <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Select Currency</Text>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Select Currency</Text>
                         <ScrollView style={{ maxHeight: 400 }}>
                             {currencies.map((c) => (
                                 <TouchableOpacity
                                     key={c.code}
-                                    style={[styles.selectBox, { borderBottomColor: isDark ? '#49454F' : '#E7E0EC' }]}
+                                    style={[styles.selectBox, { borderBottomColor: colors.outline }]}
                                     onPress={() => { setCurrency(c.code); setShowCurrencyModal(false); }}
                                 >
-                                    <View style={[styles.currencyIcon, { backgroundColor: isDark ? '#1D1B20' : '#F3EDF7' }]}>
-                                        <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>{c.symbol}</Text>
+                                    <View style={[styles.currencyIcon, { backgroundColor: colors.card }]}>
+                                        <Text style={{ color: colors.primary, fontWeight: 'bold' }}>{c.symbol}</Text>
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.selectText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{c.code}</Text>
-                                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 12 }}>{c.name}</Text>
+                                        <Text style={[styles.selectText, { color: colors.onSurface }]}>{c.code}</Text>
+                                        <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>{c.name}</Text>
                                     </View>
-                                    {currency === c.code && <Check color={isDark ? '#D0BCFF' : '#6750A4'} size={20} />}
+                                    {currency === c.code && <Check color={colors.primary} size={20} />}
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
                         <TouchableOpacity style={styles.modalClose} onPress={() => setShowCurrencyModal(false)}>
-                            <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>Cancel</Text>
+                            <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Cancel</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -236,7 +281,17 @@ const styles = StyleSheet.create({
     selectBox: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, gap: 16 },
     selectText: { fontSize: 16, flex: 1 },
     modalClose: { marginTop: 24, alignItems: 'center' },
-    currencyIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' }
+    currencyIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+    colorGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+    colorCircle: { width: 48, height: 48, borderRadius: 24, elevation: 2 },
+    aboutSection: { alignItems: 'center', paddingVertical: 40, marginTop: 24 },
+    aboutLogoContainer: { width: 80, height: 80, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 16, elevation: 4 },
+    aboutLogo: { width: 60, height: 60, borderRadius: 12 },
+    aboutTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
+    aboutVersion: { fontSize: 13, marginBottom: 12 },
+    proBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
+    proBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+    aboutCopyright: { fontSize: 11, textAlign: 'center', opacity: 0.7 }
 });
 
 export default Settings;

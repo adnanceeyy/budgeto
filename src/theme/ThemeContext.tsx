@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Colors, ThemeType } from '../theme/colors';
+import { ColorPresets, ThemeType, ColorThemeType } from '../theme/colors';
 
 interface ThemeContextType {
     theme: ThemeType;
-    colors: typeof Colors.dark;
+    colorTheme: ColorThemeType;
+    colors: any;
     toggleTheme: () => void;
     setTheme: (theme: ThemeType) => void;
+    setColorTheme: (colorTheme: ColorThemeType) => void;
     currency: string;
     setCurrency: (currency: string) => void;
 }
@@ -17,6 +19,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const systemScheme = useColorScheme();
     const [theme, setThemeState] = useState<ThemeType>(systemScheme === 'light' ? 'light' : 'dark');
+    const [colorTheme, setColorThemeState] = useState<ColorThemeType>('purple');
     const [currency, setCurrencyState] = useState<string>('INR');
 
     useEffect(() => {
@@ -24,6 +27,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const savedTheme = await AsyncStorage.getItem('user-theme');
             if (savedTheme) {
                 setThemeState(savedTheme as ThemeType);
+            }
+            const savedColorTheme = await AsyncStorage.getItem('user-color-theme');
+            if (savedColorTheme) {
+                setColorThemeState(savedColorTheme as ColorThemeType);
             }
             const savedCurrency = await AsyncStorage.getItem('user-currency');
             if (savedCurrency) {
@@ -38,6 +45,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await AsyncStorage.setItem('user-theme', newTheme);
     };
 
+    const setColorTheme = async (newColorTheme: ColorThemeType) => {
+        setColorThemeState(newColorTheme);
+        await AsyncStorage.setItem('user-color-theme', newColorTheme);
+    };
+
     const toggleTheme = () => {
         const newTheme = theme === 'dark' ? 'light' : 'dark';
         setTheme(newTheme);
@@ -48,14 +60,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await AsyncStorage.setItem('user-currency', newCurrency);
     };
 
-    const colors = theme === 'dark' ? Colors.dark : Colors.light;
+    const colors = ColorPresets[colorTheme]?.[theme] || ColorPresets.purple[theme];
 
     return (
         <ThemeContext.Provider value={{
             theme,
+            colorTheme,
             colors,
             toggleTheme,
             setTheme,
+            setColorTheme,
             currency,
             setCurrency
         }}>

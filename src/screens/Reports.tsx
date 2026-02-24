@@ -1,350 +1,355 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, Dimensions, Platform, TouchableOpacity, Modal } from 'react-native';
-import { PieChart, BarChart } from 'react-native-gifted-charts';
+import { StyleSheet, View, Text, ScrollView, Dimensions, Platform, Modal } from 'react-native';
+import SoundButton from '../components/SoundButton';
+import { PieChart } from 'react-native-gifted-charts';
 import { useTheme } from '../theme/ThemeContext';
-import { Colors } from '../theme/colors';
 import { dbService } from '../database/db';
-import { Sparkles, ArrowLeft, TrendingUp, Filter, Calendar as CalIcon, ChevronDown, Check, TrendingDown } from 'lucide-react-native';
+import {
+    Calendar as CalIcon, ChevronDown, ChevronLeft, ChevronRight,
+    Plus, Layout as LayoutIcon, Search, Menu, Filter
+} from 'lucide-react-native';
 import Background from '../components/Background';
 import GlassCard from '../components/GlassCard';
-import { format, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay, startOfMonth, endOfMonth, subMonths, isWithinInterval, startOfDay, endOfDay, startOfYear, endOfYear } from 'date-fns';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import {
+    format, startOfWeek, endOfWeek, startOfMonth, endOfMonth,
+    startOfYear, endOfYear, addMonths, subMonths, addWeeks,
+    subWeeks, addYears, subYears, isWithinInterval
+} from 'date-fns';
+import Animated, { FadeInDown, FadeInUp, FadeIn, Layout } from 'react-native-reanimated';
+import { CATEGORY_ICONS } from '../utils/iconLibrary';
 
 const { width } = Dimensions.get('window');
 
 const Reports = ({ navigation }: any) => {
-    const { theme, currency } = useTheme();
+    const { theme, currency, colors } = useTheme();
     const [pieData, setPieData] = useState<any[]>([]);
-    const [barData, setBarData] = useState<any[]>([]);
     const [totalValue, setTotalValue] = useState(0);
-    const [incomeTotal, setIncomeTotal] = useState(0);
-    const [expenseTotal, setExpenseTotal] = useState(0);
-    type FilterRangeType = 'Today' | 'This Week' | 'This Month' | 'Last Month' | 'This Year' | 'All Time';
-    const [filterRange, setFilterRange] = useState<FilterRangeType>('This Month');
     const [reportType, setReportType] = useState<'expense' | 'income'>('expense');
-    const [showFilterModal, setShowFilterModal] = useState(false);
-    const isDark = theme === 'dark';
+    const [period, setPeriod] = useState<'Week' | 'Month' | 'Year'>('Month');
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [categoryList, setCategoryList] = useState<any[]>([]);
+    const [showSortModal, setShowSortModal] = useState(false);
+    const [showDateModal, setShowDateModal] = useState(false);
+    const [sortOption, setSortOption] = useState<'highest' | 'lowest' | 'az'>('highest');
+
+    useEffect(() => {
+        const unsubscribe = navigation.addListener('focus', loadData);
+        loadData();
+        return unsubscribe;
+    }, [navigation, period, currentDate, reportType, sortOption]);
+
+    const loadData = async () => {
+        let txs = await dbService.getTransactions();
+        let interval: { start: Date; end: Date };
+
+        if (period === 'Week') {
+            interval = { start: startOfWeek(currentDate), end: endOfWeek(currentDate) };
+        } else if (period === 'Month') {
+            interval = { start: startOfMonth(currentDate), end: endOfMonth(currentDate) };
+        } else {
+            interval = { start: startOfYear(currentDate), end: endOfYear(currentDate) };
+        }
+
+        const filteredTxs = txs.filter((t: any) =>
+            t.type === reportType &&
+            isWithinInterval(new Date(t.date), interval)
+        );
+
+        let total = 0;
+        const catMap: any = {};
+
+        filteredTxs.forEach((t: any) => {
+            total += t.amount;
+            const name = t.category_name || 'Other';
+            if (!catMap[name]) {
+                catMap[name] = {
+                    value: 0,
+                    color: t.category_color || colors.primary,
+                    label: name,
+                    icon: t.icon || 'tag'
+                };
+            }
+            catMap[name].value += t.amount;
+        });
+
+        setTotalValue(total);
+
+        let sortedCats = Object.values(catMap);
+        if (sortOption === 'highest') {
+            sortedCats = sortedCats.sort((a: any, b: any) => b.value - a.value);
+        } else if (sortOption === 'lowest') {
+            sortedCats = sortedCats.sort((a: any, b: any) => a.value - b.value);
+        } else if (sortOption === 'az') {
+            sortedCats = sortedCats.sort((a: any, b: any) => a.label.localeCompare(b.label));
+        }
+
+        const pData = sortedCats.map((item: any) => ({
+            value: item.value,
+            color: item.color,
+            label: item.label,
+        }));
+
+        setPieData(pData.length > 0 ? pData : [{ value: 0, color: colors.outline + '40', label: 'Empty' }]);
+        setCategoryList(sortedCats);
+    };
+
+    const navigateDate = (direction: 'prev' | 'next') => {
+        if (period === 'Week') {
+            setCurrentDate(direction === 'prev' ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
+        } else if (period === 'Month') {
+            setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
+        } else {
+            setCurrentDate(direction === 'prev' ? subYears(currentDate, 1) : addYears(currentDate, 1));
+        }
+    };
+
+    const getDateLabel = () => {
+        const today = new Date();
+        if (period === 'Week') {
+            const start = startOfWeek(currentDate);
+            const todayStart = startOfWeek(today);
+            if (start.getTime() === todayStart.getTime()) return 'This Week';
+            return `${format(start, 'MMM dd')} - ${format(endOfWeek(currentDate), 'dd')}`;
+        } else if (period === 'Month') {
+            const start = startOfMonth(currentDate);
+            const todayStart = startOfMonth(today);
+            if (start.getTime() === todayStart.getTime()) return 'This Month';
+            if (start.getTime() === startOfMonth(subMonths(today, 1)).getTime()) return 'Last Month';
+            return format(currentDate, 'MMMM yyyy');
+        } else if (period === 'Year') {
+            const start = startOfYear(currentDate);
+            const todayStart = startOfYear(today);
+            if (start.getTime() === todayStart.getTime()) return 'This Year';
+            return format(currentDate, 'yyyy');
+        }
+        return format(currentDate, 'yyyy');
+    };
 
     const currencySymbols: { [key: string]: string } = {
         'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥'
     };
     const symbol = currencySymbols[currency] || '₹';
 
-    useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', loadData);
-        loadData();
-        return unsubscribe;
-    }, [navigation, theme, filterRange, reportType]);
-
-    const loadData = async () => {
-        let txs = await dbService.getTransactions();
-
-        const now = new Date();
-        let interval: { start: Date; end: Date } | null = null;
-
-        if (filterRange === 'Today') {
-            interval = { start: startOfDay(now), end: endOfDay(now) };
-        } else if (filterRange === 'This Week') {
-            interval = { start: startOfWeek(now), end: endOfWeek(now) };
-        } else if (filterRange === 'This Month') {
-            interval = { start: startOfMonth(now), end: endOfMonth(now) };
-        } else if (filterRange === 'Last Month') {
-            const lastMonth = subMonths(now, 1);
-            interval = { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-        } else if (filterRange === 'This Year') {
-            interval = { start: startOfYear(now), end: endOfYear(now) };
-        }
-
-        if (interval) {
-            txs = txs.filter((t: any) => isWithinInterval(new Date(t.date), interval!));
-        }
-
-        const filteredTxs = txs.filter((t: any) => t.type === reportType);
-
-        let total = 0;
-        let incSum = 0;
-        let expSum = 0;
-
-        txs.forEach((t: any) => {
-            if (t.type === 'income') incSum += t.amount;
-            else expSum += t.amount;
-        });
-
-        setIncomeTotal(incSum);
-        setExpenseTotal(expSum);
-
-        const catMap: any = {};
-        filteredTxs.forEach((t: any) => {
-            total += t.amount;
-            const name = t.category_name || 'Other';
-            if (!catMap[name]) {
-                catMap[name] = { value: 0, color: t.category_color || (isDark ? '#D0BCFF' : '#6750A4'), label: name };
-            }
-            catMap[name].value += t.amount;
-        });
-        setTotalValue(total);
-
-        const pData = Object.values(catMap).sort((a: any, b: any) => b.value - a.value).map((item: any) => ({
-            ...item,
-            text: item.label,
-        }));
-        setPieData(pData.length > 0 ? pData : [{ value: 0, color: isDark ? '#2B2930' : '#E7E0EC', label: 'Empty' }]);
-
-        // Generate Bar Chart Data based on Range
-        let bData: any[] = [];
-        if (filterRange === 'Today') {
-            bData = [{
-                value: filteredTxs.reduce((acc: number, t: any) => acc + t.amount, 0),
-                label: format(now, 'MMM dd'),
-                frontColor: reportType === 'income' ? '#A5D6A7' : (isDark ? '#F2B8B5' : '#B3261E')
-            }];
-        } else if (filterRange === 'This Year') {
-            const months = Array.from({ length: 12 }, (_, i) => new Date(now.getFullYear(), i, 1));
-            bData = months.map(m => {
-                const monthTxs = txs.filter((t: any) => {
-                    const d = new Date(t.date);
-                    return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear() && t.type === reportType;
-                });
-                const sum = monthTxs.reduce((acc: number, t: any) => acc + t.amount, 0);
-                return {
-                    value: sum,
-                    label: format(m, 'MMM')[0],
-                    frontColor: reportType === 'income' ? '#A5D6A7' : (isDark ? '#F2B8B5' : '#B3261E'),
-                    topLabelComponent: () => sum > 0 ? (
-                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 9, marginBottom: 4 }}>
-                            {sum > 999 ? (sum / 1000).toFixed(0) + 'k' : sum.toFixed(0)}
-                        </Text>
-                    ) : null
-                };
-            });
-        } else if (filterRange === 'All Time') {
-            const months = Array.from({ length: 6 }, (_, i) => subMonths(now, 5 - i));
-            bData = months.map(m => {
-                const monthTxs = txs.filter((t: any) => {
-                    const d = new Date(t.date);
-                    return d.getMonth() === m.getMonth() && d.getFullYear() === m.getFullYear() && t.type === reportType;
-                });
-                const sum = monthTxs.reduce((acc: number, t: any) => acc + t.amount, 0);
-                return {
-                    value: sum,
-                    label: format(m, 'MMM'),
-                    frontColor: reportType === 'income' ? '#A5D6A7' : (isDark ? '#F2B8B5' : '#B3261E'),
-                    topLabelComponent: () => sum > 0 ? (
-                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 9, marginBottom: 4 }}>
-                            {sum > 999 ? (sum / 1000).toFixed(0) + 'k' : sum.toFixed(0)}
-                        </Text>
-                    ) : null
-                };
-            });
-        } else {
-            // Default to Daily view for Week/Month/Last Month
-            const start = interval ? interval.start : subMonths(now, 1);
-            const end = interval ? interval.end : now;
-            const days = eachDayOfInterval({ start, end });
-
-            // If too many days (e.g. Month), we might want to skip some labels or show every few days
-            bData = days.map((day, index) => {
-                const dayTxs = txs.filter((t: any) => isSameDay(new Date(t.date), day) && t.type === reportType);
-                const sum = dayTxs.reduce((acc: number, t: any) => acc + t.amount, 0);
-                const shouldShowLabel = days.length <= 7 || index % 5 === 0 || index === days.length - 1;
-
-                return {
-                    value: sum,
-                    label: shouldShowLabel ? (days.length <= 7 ? format(day, 'E')[0] : format(day, 'd')) : '',
-                    frontColor: reportType === 'income' ? '#A5D6A7' : (isDark ? '#F2B8B5' : '#B3261E'),
-                    topLabelComponent: () => sum > 0 && days.length <= 15 ? (
-                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 9, marginBottom: 4 }}>
-                            {sum > 999 ? (sum / 1000).toFixed(0) + 'k' : sum.toFixed(0)}
-                        </Text>
-                    ) : null
-                };
-            });
-        }
-        setBarData(bData);
-    };
-
-    const RangeOption = ({ label }: { label: any }) => (
-        <TouchableOpacity
-            style={[styles.filterOption, { borderBottomColor: isDark ? '#49454F' : '#E7E0EC' }]}
-            onPress={() => {
-                setFilterRange(label);
-                setShowFilterModal(false);
-            }}
-        >
-            <Text style={[styles.filterText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{label}</Text>
-            {filterRange === label && <Check size={20} color={isDark ? '#D0BCFF' : '#6750A4'} />}
-        </TouchableOpacity>
-    );
-
     return (
         <Background>
+            <View style={styles.topSection}>
+                <View style={styles.navHeader}>
+                    <SoundButton style={styles.navBtn} onPress={() => setShowSortModal(true)}>
+                        <Filter color={colors.onSurface} size={24} />
+                    </SoundButton>
+                    <SoundButton
+                        style={styles.titleContainer}
+                        onPress={() => setReportType(reportType === 'expense' ? 'income' : 'expense')}
+                    >
+                        <Text style={[styles.mainTitle, { color: colors.onSurface }]}>
+                            {reportType === 'expense' ? 'Expenses' : 'Income'}
+                        </Text>
+                        <ChevronDown size={18} color={colors.onSurfaceVariant} />
+                    </SoundButton>
+                    <SoundButton style={styles.navBtn} onPress={() => setShowDateModal(true)}>
+                        <CalIcon color={colors.onSurface} size={24} />
+                    </SoundButton>
+                </View>
+
+                {/* Period Selector Tabs */}
+                <View style={styles.periodTabs}>
+                    {['Week', 'Month', 'Year'].map((p: any) => (
+                        <SoundButton
+                            key={p}
+                            style={[
+                                styles.tab,
+                                period === p && { backgroundColor: theme === 'dark' ? '#FFFFFF' : '#1C1B1F' }
+                            ]}
+                            onPress={() => {
+                                setPeriod(p);
+                                setCurrentDate(new Date());
+                            }}
+                        >
+                            <Text style={[
+                                styles.tabText,
+                                { color: period === p ? (theme === 'dark' ? '#000000' : '#FFFFFF') : colors.onSurfaceVariant }
+                            ]}>
+                                {p}
+                            </Text>
+                        </SoundButton>
+                    ))}
+                </View>
+
+                {/* Date Navigation Swiper */}
+                <View style={[styles.dateSwiper, { borderBottomColor: colors.outline + '20' }]}>
+                    <SoundButton onPress={() => navigateDate('prev')}>
+                        <Text style={[styles.swiperSideText, { color: colors.onSurfaceVariant }]}>
+                            {period === 'Month' ? format(subMonths(currentDate, 1), 'MMM') : (period === 'Week' ? 'Prev' : format(subYears(currentDate, 1), 'yyyy'))}
+                        </Text>
+                    </SoundButton>
+                    <View style={styles.activeDateBox}>
+                        <Text style={[styles.activeDateText, { color: colors.primary }]}>{getDateLabel()}</Text>
+                        <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />
+                    </View>
+                    <SoundButton onPress={() => navigateDate('next')}>
+                        <Text style={[styles.swiperSideText, { color: colors.onSurfaceVariant }]}>
+                            {period === 'Month' ? format(addMonths(currentDate, 1), 'MMM') : (period === 'Week' ? 'Next' : format(addYears(currentDate, 1), 'yyyy'))}
+                        </Text>
+                    </SoundButton>
+                </View>
+            </View>
+
             <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <ArrowLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
-                    </TouchableOpacity>
-                    <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Flow Analysis</Text>
-                    <TouchableOpacity style={[styles.filterChip, { backgroundColor: isDark ? '#2B2930' : '#F3EDF7' }]} onPress={() => setShowFilterModal(true)}>
-                        <Text style={[styles.filterChipText, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>{filterRange}</Text>
-                        <ChevronDown size={16} color={isDark ? '#D0BCFF' : '#6750A4'} />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Type Selector */}
-                <View style={styles.typeSelector}>
-                    <TouchableOpacity
-                        style={[styles.typeBtn, reportType === 'expense' && { backgroundColor: isDark ? '#F2B8B5' : '#B3261E' }]}
-                        onPress={() => setReportType('expense')}
-                    >
-                        <TrendingDown size={18} color={reportType === 'expense' ? (isDark ? '#601410' : '#FFFFFF') : (isDark ? '#F2B8B5' : '#B3261E')} />
-                        <Text style={[styles.typeBtnText, { color: reportType === 'expense' ? (isDark ? '#601410' : '#FFFFFF') : (isDark ? '#F2B8B5' : '#B3261E') }]}>Expenses</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.typeBtn, reportType === 'income' && { backgroundColor: '#146C2E' }]}
-                        onPress={() => setReportType('income')}
-                    >
-                        <TrendingUp size={18} color={reportType === 'income' ? '#FFFFFF' : '#146C2E'} />
-                        <Text style={[styles.typeBtnText, { color: reportType === 'income' ? '#FFFFFF' : '#146C2E' }]}>Income</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.summaryRow}>
-                    <GlassCard style={styles.sumCard}>
-                        <Text style={[styles.sumLabel, { color: isDark ? '#CAC4D0' : '#49454F' }]}>
-                            Net Balance • {filterRange}
-                        </Text>
-                        <Text style={[styles.sumValue, { color: (incomeTotal - expenseTotal) >= 0 ? '#146C2E' : '#B3261E' }]}>
-                            {(incomeTotal - expenseTotal) >= 0 ? '+' : '-'}{symbol}{Math.abs(incomeTotal - expenseTotal).toLocaleString()}
-                        </Text>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
-                        {reportType === 'income' ? 'Income' : 'Expense'} Composition
-                    </Text>
-                    <GlassCard style={styles.chartWrapper}>
-                        <View style={styles.pieContainer}>
-                            <PieChart
-                                data={pieData}
-                                donut
-                                radius={width * 0.28}
-                                innerRadius={width * 0.22}
-                                innerCircleColor={isDark ? '#1C1B1F' : '#FFFFFF'}
-                                centerLabelComponent={() => (
-                                    <View style={{ alignItems: 'center' }}>
-                                        <Text style={{ color: isDark ? '#CAC4D0' : '#49454F', fontSize: 12, fontWeight: '500' }}>Total</Text>
-                                        <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontSize: 24, fontWeight: '700' }}>
-                                            {symbol}{totalValue > 9999 ? (totalValue / 1000).toFixed(1) + 'k' : totalValue.toLocaleString()}
-                                        </Text>
-                                    </View>
-                                )}
-                            />
-                        </View>
-                        <View style={styles.legend}>
-                            {pieData.map((d, i) => (
-                                <View key={i} style={styles.legendRow}>
-                                    <View style={[styles.dot, { backgroundColor: d.color }]} />
-                                    <View style={{ flex: 1 }}>
-                                        <View style={styles.legendTopRow}>
-                                            <Text style={[styles.legendText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{d.label}</Text>
-                                            <Text style={[styles.legendValue, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>
-                                                {symbol}{d.value.toLocaleString()}
-                                            </Text>
-                                        </View>
-                                        <View style={[styles.progressBarContainer, { backgroundColor: isDark ? '#2B2930' : '#F3EDF7' }]}>
-                                            <View
-                                                style={[
-                                                    styles.progressBar,
-                                                    {
-                                                        backgroundColor: d.color,
-                                                        width: `${totalValue > 0 ? (d.value / totalValue * 100) : 0}%`
-                                                    }
-                                                ]}
-                                            />
-                                        </View>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-                    </GlassCard>
-                </View>
-
-                <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Flow Density</Text>
-                    <GlassCard style={styles.chartWrapper}>
-                        <BarChart
-                            data={barData}
-                            barWidth={width / (barData.length > 7 ? barData.length * 1.8 : 10)}
-                            spacing={barData.length > 7 ? 12 : 24}
-                            noOfSections={4}
-                            barBorderRadius={12}
-                            yAxisThickness={0}
-                            xAxisThickness={0}
-                            hideRules
-                            yAxisTextStyle={{ color: isDark ? '#938F99' : '#79747E', fontSize: 10 }}
-                            xAxisLabelTextStyle={{ color: isDark ? '#938F99' : '#79747E', fontSize: 10, fontWeight: '600' }}
-                            animationDuration={800}
-                            isAnimated
+                <Animated.View entering={FadeIn.duration(600)} style={styles.chartSection}>
+                    <View style={styles.pieContainer}>
+                        <PieChart
+                            data={pieData}
+                            donut
+                            radius={width * 0.2}
+                            innerRadius={width * 0.15}
+                            innerCircleColor={colors.background}
+                            centerLabelComponent={() => (
+                                <Text style={{ color: colors.onSurface, fontSize: 18, fontWeight: '700' }}>
+                                    {totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Text>
+                            )}
                         />
-                    </GlassCard>
+                    </View>
+                    <View style={styles.legendWrapper}>
+                        {categoryList.slice(0, 5).map((item, idx) => (
+                            <View key={idx} style={styles.legendItem}>
+                                <View style={[styles.dot, { backgroundColor: item.color }]} />
+                                <Text style={[styles.legendName, { color: colors.onSurface }]} numberOfLines={1}>{item.label}</Text>
+                                <Text style={[styles.legendPercent, { color: colors.onSurfaceVariant, textAlign: 'right', minWidth: 45 }]}>
+                                    {totalValue > 0 ? ((item.value / totalValue) * 100).toFixed(1) : 0}%
+                                </Text>
+                            </View>
+                        ))}
+                    </View>
+                </Animated.View>
+
+                {/* Detailed Category List */}
+                <View style={styles.listSection}>
+                    {categoryList.map((cat, idx) => {
+                        const Icon = CATEGORY_ICONS[cat.icon] || CATEGORY_ICONS.tag;
+                        const percent = totalValue > 0 ? (cat.value / totalValue) * 100 : 0;
+                        return (
+                            <Animated.View key={idx} entering={FadeInDown.delay(idx * 100).duration(500)} layout={Layout.springify()}>
+                                <View style={styles.catItem}>
+                                    <View style={[styles.iconCircle, { backgroundColor: colors.primaryContainer }]}>
+                                        <Icon size={20} color={colors.primary} />
+                                    </View>
+                                    <View style={styles.itemDetail}>
+                                        <View style={styles.itemHeader}>
+                                            <Text style={[styles.catName, { color: colors.onSurface }]}>{cat.label}</Text>
+                                            <Text style={[styles.catPercent, { color: colors.onSurfaceVariant, marginLeft: 8 }]}>{percent.toFixed(2)}%</Text>
+                                        </View>
+                                        <View style={[styles.progressBg, { backgroundColor: colors.outline + '20' }]}>
+                                            <View style={[styles.progressBar, { width: `${percent}%`, backgroundColor: colors.primary }]} />
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.catAmount, { color: colors.onSurface, fontWeight: '700' }]}>
+                                        {cat.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Text>
+                                </View>
+                            </Animated.View>
+                        );
+                    })}
                 </View>
             </ScrollView>
 
-            <Modal visible={showFilterModal} transparent animationType="slide">
+            {/* Sort Modal */}
+            <Modal visible={showSortModal} transparent animationType="slide" onRequestClose={() => setShowSortModal(false)}>
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
-                        <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Time Range</Text>
-                        <RangeOption label="Today" />
-                        <RangeOption label="This Week" />
-                        <RangeOption label="This Month" />
-                        <RangeOption label="Last Month" />
-                        <RangeOption label="This Year" />
-                        <RangeOption label="All Time" />
-                        <TouchableOpacity style={styles.modalClose} onPress={() => setShowFilterModal(false)}>
-                            <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontWeight: 'bold' }}>Close</Text>
-                        </TouchableOpacity>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Sort Categories</Text>
+                        {['highest', 'lowest', 'az'].map((opt) => (
+                            <SoundButton
+                                key={opt}
+                                style={styles.modalOptionBtn}
+                                onPress={() => { setSortOption(opt as any); setShowSortModal(false); }}
+                            >
+                                <Text style={[styles.modalOptionText, { color: sortOption === opt ? colors.primary : colors.onSurface }]}>
+                                    {opt === 'highest' ? 'Highest Amount' : opt === 'lowest' ? 'Lowest Amount' : 'Alphabetical (A-Z)'}
+                                </Text>
+                            </SoundButton>
+                        ))}
+                        <SoundButton style={[styles.modalOptionBtn, { borderBottomWidth: 0, marginTop: 10, alignSelf: 'center' }]} onPress={() => setShowSortModal(false)}>
+                            <Text style={[{ color: colors.primary, fontSize: 16, fontWeight: '700' }]}>Close</Text>
+                        </SoundButton>
                     </View>
                 </View>
             </Modal>
+
+            {/* Date Quick Jump Modal */}
+            <Modal visible={showDateModal} transparent animationType="slide" onRequestClose={() => setShowDateModal(false)}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+                        <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Quick Jump</Text>
+                        <SoundButton style={styles.modalOptionBtn} onPress={() => { setPeriod('Week'); setCurrentDate(new Date()); setShowDateModal(false); }}>
+                            <Text style={[styles.modalOptionText, { color: colors.onSurface }]}>This Week</Text>
+                        </SoundButton>
+                        <SoundButton style={styles.modalOptionBtn} onPress={() => { setPeriod('Month'); setCurrentDate(new Date()); setShowDateModal(false); }}>
+                            <Text style={[styles.modalOptionText, { color: colors.onSurface }]}>This Month</Text>
+                        </SoundButton>
+                        <SoundButton style={styles.modalOptionBtn} onPress={() => { setPeriod('Month'); setCurrentDate(subMonths(new Date(), 1)); setShowDateModal(false); }}>
+                            <Text style={[styles.modalOptionText, { color: colors.onSurface }]}>Last Month</Text>
+                        </SoundButton>
+                        <SoundButton style={styles.modalOptionBtn} onPress={() => { setPeriod('Year'); setCurrentDate(new Date()); setShowDateModal(false); }}>
+                            <Text style={[styles.modalOptionText, { color: colors.onSurface }]}>This Year</Text>
+                        </SoundButton>
+                        <SoundButton style={[styles.modalOptionBtn, { borderBottomWidth: 0, marginTop: 10, alignSelf: 'center' }]} onPress={() => setShowDateModal(false)}>
+                            <Text style={[{ color: colors.primary, fontSize: 16, fontWeight: '700' }]}>Close</Text>
+                        </SoundButton>
+                    </View>
+                </View>
+            </Modal>
+
+            {/* Bottom FAB */}
+            <SoundButton
+                style={[styles.fab, { backgroundColor: colors.primary }]}
+                onPress={() => navigation.navigate('AddTransaction')}
+            >
+                <Plus color={colors.onPrimary} size={32} />
+            </SoundButton>
         </Background>
     );
 };
 
 const styles = StyleSheet.create({
+    topSection: { paddingTop: 60, paddingBottom: 10 },
+    navHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, marginBottom: 20 },
+    navBtn: { padding: 8 },
+    titleContainer: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    mainTitle: { fontSize: 22, fontWeight: '600' },
+    periodTabs: { flexDirection: 'row', marginHorizontal: 20, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 12, padding: 4, marginBottom: 20 },
+    tab: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: 10 },
+    tabText: { fontSize: 14, fontWeight: '600' },
+    dateSwiper: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 40, borderBottomWidth: 1, paddingBottom: 10 },
+    swiperSideText: { fontSize: 14, fontWeight: '500', opacity: 0.6 },
+    activeDateBox: { alignItems: 'center' },
+    activeDateText: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+    activeIndicator: { width: 30, height: 3, borderRadius: 2 },
     container: { flex: 1 },
-    content: { paddingBottom: 110 },
-    header: { flexDirection: 'row', alignItems: 'center', padding: 24, paddingTop: 60, gap: 16 },
-    backBtn: { padding: 4 },
-    title: { fontSize: 24, fontWeight: '400', flex: 1, letterSpacing: -0.5 },
-    filterChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, gap: 8 },
-    filterChipText: { fontSize: 14, fontWeight: '500' },
-    typeSelector: { flexDirection: 'row', gap: 12, paddingHorizontal: 20, marginBottom: 24 },
-    typeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 24, borderWidth: 1.5, borderColor: 'transparent' },
-    typeBtnText: { fontSize: 14, fontWeight: '700' },
-    summaryRow: { paddingHorizontal: 20, marginBottom: 32 },
-    sumCard: { padding: 24 },
-    sumLabel: { fontSize: 13, marginBottom: 4, fontWeight: '500' },
-    sumValue: { fontSize: 32, fontWeight: '600' },
-    section: { paddingHorizontal: 20, marginBottom: 32 },
-    sectionTitle: { fontSize: 18, fontWeight: '500', marginBottom: 16, marginLeft: 4 },
-    chartWrapper: { padding: 24, alignItems: 'center' },
-    pieContainer: { alignItems: 'center', marginBottom: 28 },
-    legend: { width: '100%', gap: 20 },
-    legendRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
-    dot: { width: 12, height: 12, borderRadius: 6 },
-    legendTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-    legendText: { fontSize: 15, fontWeight: '600', letterSpacing: -0.3 },
-    legendValue: { fontSize: 14, fontWeight: '700' },
-    progressBarContainer: { height: 6, borderRadius: 3, overflow: 'hidden' },
+    content: { paddingBottom: 120 },
+    chartSection: { flexDirection: 'row', padding: 24, alignItems: 'center', justifyContent: 'space-between' },
+    pieContainer: { flex: 1.2, alignItems: 'center' },
+    legendWrapper: { flex: 1.4, gap: 10, paddingLeft: 8 },
+    legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    dot: { width: 8, height: 8, borderRadius: 4 },
+    legendName: { fontSize: 12, fontWeight: '500', flex: 1 },
+    legendPercent: { fontSize: 11, minWidth: 40, textAlign: 'right' },
+    listSection: { paddingHorizontal: 20 },
+    catItem: { flexDirection: 'row', alignItems: 'center', marginBottom: 24, gap: 16 },
+    iconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    itemDetail: { flex: 1, gap: 8 },
+    itemHeader: { flexDirection: 'row', gap: 8, alignItems: 'baseline' },
+    catName: { fontSize: 16, fontWeight: '600' },
+    catPercent: { fontSize: 12 },
+    progressBg: { height: 6, borderRadius: 3, overflow: 'hidden' },
     progressBar: { height: '100%', borderRadius: 3 },
-    legendValueBox: { backgroundColor: 'rgba(0,0,0,0.05)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+    catAmount: { fontSize: 16, fontWeight: '700', width: 90, textAlign: 'right' },
+    fab: { position: 'absolute', bottom: 20, alignSelf: 'center', width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, zIndex: 10 },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, elevation: 12 },
-    modalTitle: { fontSize: 20, fontWeight: '600', marginBottom: 24 },
-    filterOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1 },
-    filterText: { fontSize: 16 },
-    modalClose: { marginTop: 32, alignItems: 'center', padding: 12 }
+    modalCard: { padding: 24, paddingBottom: 40, borderTopLeftRadius: 36, borderTopRightRadius: 36 },
+    modalTitle: { fontSize: 24, fontWeight: '700', marginBottom: 20 },
+    modalOptionBtn: { paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: 'rgba(150,150,150,0.1)' },
+    modalOptionText: { fontSize: 18, fontWeight: '500' }
 });
 
 export default Reports;

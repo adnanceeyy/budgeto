@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, Switch, TouchableOpacity, ScrollView, Platform, Modal, Image } from 'react-native';
+import { StyleSheet, View, Text, Switch, ScrollView, Platform, Modal, Image } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { useTheme } from '../theme/ThemeContext';
 import { ColorThemeType, BaseThemeColors } from '../theme/colors';
 import Background from '../components/Background';
-import { ChevronRight, Shield, Database, Palette, Info, Moon, Sun, Trash2, Key, Bell, Phone, Check, Globe, Sparkles } from 'lucide-react-native';
+import { ChevronRight, Shield, Database, Palette, Info, Moon, Sun, Trash2, Key, Check, Globe, Sparkles, Landmark } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { dbService } from '../database/db';
 import { useNavigation } from '@react-navigation/native';
 import ModalAlert from '../components/ModalAlert';
 
 const Settings = () => {
-    const { theme, setTheme, colorTheme, setColorTheme, colors, currency, setCurrency } = useTheme();
+    const { theme, setTheme, colorTheme, setColorTheme, colors, currency, setCurrency, soundEnabled, setSoundEnabled } = useTheme();
     const isDark = theme === 'dark';
     const navigation = useNavigation<any>();
 
@@ -40,8 +44,8 @@ const Settings = () => {
     const colorPresets = [
         { id: 'purple', name: 'Royal Purple', color: BaseThemeColors.purple },
         { id: 'ocean', name: 'Ocean Breeze', color: BaseThemeColors.ocean },
-        { id: 'emerald', name: 'Emerald City', color: BaseThemeColors.emerald },
-        { id: 'crimson', name: 'Crimson Tide', color: BaseThemeColors.crimson }
+        { id: 'yellow', name: 'Golden Sun', color: BaseThemeColors.yellow },
+        { id: 'ruby', name: 'Ruby Dark', color: BaseThemeColors.ruby }
     ];
 
     const handleWipeRequest = () => {
@@ -67,8 +71,88 @@ const Settings = () => {
         });
     };
 
+    const handleExportData = async () => {
+        try {
+            const dataStr = await dbService.exportDatabaseJson();
+            if (Platform.OS === 'web') {
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Budgeto_Backup_${Date.now()}.json`;
+                a.click();
+            } else {
+                const fileUri = FileSystem.documentDirectory + `Budgeto_Backup_${Date.now()}.json`;
+                await FileSystem.writeAsStringAsync(fileUri, dataStr, { encoding: FileSystem.EncodingType.UTF8 });
+                await Sharing.shareAsync(fileUri);
+            }
+            setAlertConfig({
+                visible: true,
+                title: 'Export Successful',
+                message: 'Your financial data has been packaged securely.',
+                type: 'success'
+            });
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+        } catch (error) {
+            console.error("Export error", error);
+        }
+    };
+
+    const handleImportData = async () => {
+        try {
+            if (Platform.OS === 'web') {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = (e: any) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = async (event) => {
+                            try {
+                                await dbService.importDatabaseJson(event.target?.result as string);
+                                window.location.reload();
+                            } catch (e) {
+                                alert("Invalid backup file.");
+                            }
+                        };
+                        reader.readAsText(file);
+                    }
+                };
+                input.click();
+            } else {
+                const result = await DocumentPicker.getDocumentAsync({
+                    type: ['application/json', 'text/plain', '*/*'],
+                    copyToCacheDirectory: true
+                });
+                if (result.canceled) return;
+
+                const fileUri = result.assets[0].uri;
+                const jsonString = await FileSystem.readAsStringAsync(fileUri, { encoding: FileSystem.EncodingType.UTF8 });
+
+                await dbService.importDatabaseJson(jsonString);
+
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => { });
+                setAlertConfig({
+                    visible: true,
+                    title: 'Import Successful',
+                    message: 'Your backup has been restored. Restart the app or refresh for changes to take full effect.',
+                    type: 'success'
+                });
+            }
+        } catch (error) {
+            console.error("Import error", error);
+            setAlertConfig({
+                visible: true,
+                title: 'Import Failed',
+                message: 'Could not restore backup. Invalid format or corrupted file.',
+                type: 'error'
+            });
+        }
+    };
+
     const SettingItem = ({ icon: Icon, title, subtitle, value, onPress, danger }: any) => (
-        <TouchableOpacity
+        <SoundButton
             style={styles.item}
             onPress={onPress}
         >
@@ -83,7 +167,7 @@ const Settings = () => {
                 {value && <Text style={[styles.itemValue, { color: isDark ? '#D0BCFF' : '#6750A4' }]}>{value}</Text>}
                 <ChevronRight size={18} color={isDark ? '#CAC4D0' : '#49454F'} />
             </View>
-        </TouchableOpacity>
+        </SoundButton>
     );
 
     return (
@@ -107,6 +191,12 @@ const Settings = () => {
                         onPress={() => navigation.navigate('ManageCategories')}
                     />
                     <SettingItem
+                        icon={Landmark}
+                        title="Manage Accounts"
+                        subtitle="Create and customize vaults"
+                        onPress={() => navigation.navigate('ManageAccounts')}
+                    />
+                    <SettingItem
                         icon={Globe}
                         title="Currency"
                         subtitle="Default trading currency"
@@ -118,37 +208,36 @@ const Settings = () => {
                 <View style={styles.section}>
                     <Text style={[styles.sectionHeader, { color: colors.primary }]}>Security & Privacy</Text>
                     <SettingItem
-                        icon={Key}
-                        title="Change Passcode"
-                        subtitle="Update your security PIN"
-                        onPress={() => navigation.navigate('ChangePasscode')}
-                    />
-                    <SettingItem
                         icon={Shield}
-                        title="Biometric Lock"
-                        subtitle="Unlock using fingerprint or face"
-                        onPress={() => setAlertConfig({
-                            visible: true,
-                            title: 'Coming Soon',
-                            message: 'Biometric authentication will be available in the next system update.',
-                            type: 'info'
-                        })}
+                        title="Security Center"
+                        subtitle="Manage passcodes and active encrypted vaults"
+                        onPress={() => navigation.navigate('SecurityCenter')}
                     />
                 </View>
 
                 <View style={styles.section}>
                     <Text style={[styles.sectionHeader, { color: colors.primary }]}>General</Text>
                     <SettingItem
-                        icon={Bell}
-                        title="Notifications"
-                        subtitle="Manage alerts and reminders"
-                        onPress={() => navigation.navigate('Reminders')}
-                    />
-                    <SettingItem
                         icon={Info}
                         title="About Budgeto"
-                        subtitle="Version 2.3.0 - Image Hub Update"
-                        onPress={() => { }}
+                        subtitle="Version 2.3.0 - Feedback & Legal"
+                        onPress={() => navigation.navigate('AboutBudgeto')}
+                    />
+                </View>
+
+                <View style={styles.section}>
+                    <Text style={[styles.sectionHeader, { color: colors.primary }]}>Data Management</Text>
+                    <SettingItem
+                        icon={Database}
+                        title="Export Financial Flow"
+                        subtitle="Save all records as a backup file"
+                        onPress={handleExportData}
+                    />
+                    <SettingItem
+                        icon={Sparkles}
+                        title="Restore Backup"
+                        subtitle="Import data from a previous backup file"
+                        onPress={handleImportData}
                     />
                 </View>
 
@@ -162,32 +251,14 @@ const Settings = () => {
                         danger
                     />
                 </View>
-                <View style={styles.aboutSection}>
-                    <View style={[styles.aboutLogoContainer, { backgroundColor: colors.card }]}>
-                        <Image
-                            source={require('../../assets/icon.png')}
-                            style={styles.aboutLogo}
-                        />
-                    </View>
-                    <Text style={[styles.aboutTitle, { color: colors.onSurface }]}>Budgeto Hub</Text>
-                    <Text style={[styles.aboutVersion, { color: colors.onSurfaceVariant }]}>Stable Release V2.2.0</Text>
-                    <View style={[styles.proBadge, { backgroundColor: colors.primary + '20' }]}>
-                        <Sparkles size={14} color={colors.primary} />
-                        <Text style={[styles.proBadgeText, { color: colors.primary }]}>PREMIUM SYSTEM</Text>
-                    </View>
-                    <Text style={[styles.aboutCopyright, { color: colors.onSurfaceVariant }]}>
-                        &copy; 2024 Budgeto. Open Source. Private. Secure.
-                    </Text>
-                </View>
             </ScrollView>
 
-            {/* Theme Modal */}
             <Modal visible={showThemeModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Select Theme</Text>
                         {themes.map((t) => (
-                            <TouchableOpacity
+                            <SoundButton
                                 key={t.id}
                                 style={[styles.selectBox, { borderBottomColor: colors.outline }]}
                                 onPress={() => { setTheme(t.id as any); setShowThemeModal(false); }}
@@ -195,12 +266,12 @@ const Settings = () => {
                                 <t.icon size={20} color={colors.primary} />
                                 <Text style={[styles.selectText, { color: colors.onSurface }]}>{t.name}</Text>
                                 {(theme === t.id) && <Check color={colors.primary} size={20} />}
-                            </TouchableOpacity>
+                            </SoundButton>
                         ))}
                         <Text style={[styles.modalTitle, { color: colors.onSurface, marginTop: 24 }]}>Accent Color</Text>
                         <View style={styles.colorGrid}>
                             {colorPresets.map((p) => (
-                                <TouchableOpacity
+                                <SoundButton
                                     key={p.id}
                                     style={[
                                         styles.colorCircle,
@@ -212,21 +283,20 @@ const Settings = () => {
                             ))}
                         </View>
 
-                        <TouchableOpacity style={styles.modalClose} onPress={() => setShowThemeModal(false)}>
+                        <SoundButton style={styles.modalClose} onPress={() => setShowThemeModal(false)}>
                             <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Done</Text>
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
                 </View>
             </Modal>
 
-            {/* Currency Modal */}
             <Modal visible={showCurrencyModal} transparent animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
                         <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Select Currency</Text>
                         <ScrollView style={{ maxHeight: 400 }}>
                             {currencies.map((c) => (
-                                <TouchableOpacity
+                                <SoundButton
                                     key={c.code}
                                     style={[styles.selectBox, { borderBottomColor: colors.outline }]}
                                     onPress={() => { setCurrency(c.code); setShowCurrencyModal(false); }}
@@ -239,12 +309,12 @@ const Settings = () => {
                                         <Text style={{ color: colors.onSurfaceVariant, fontSize: 12 }}>{c.name}</Text>
                                     </View>
                                     {currency === c.code && <Check color={colors.primary} size={20} />}
-                                </TouchableOpacity>
+                                </SoundButton>
                             ))}
                         </ScrollView>
-                        <TouchableOpacity style={styles.modalClose} onPress={() => setShowCurrencyModal(false)}>
+                        <SoundButton style={styles.modalClose} onPress={() => setShowCurrencyModal(false)}>
                             <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Cancel</Text>
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
                 </View>
             </Modal>
@@ -275,23 +345,15 @@ const styles = StyleSheet.create({
     itemSubtitle: { fontSize: 13, marginTop: 2, fontWeight: '400' },
     itemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     itemValue: { fontSize: 14, fontWeight: '500' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32, elevation: 12 },
-    modalTitle: { fontSize: 20, fontWeight: '600', marginBottom: 24 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, elevation: 12 },
+    modalTitle: { fontSize: 24, fontWeight: '400', marginBottom: 24 },
     selectBox: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, gap: 16 },
     selectText: { fontSize: 16, flex: 1 },
-    modalClose: { marginTop: 24, alignItems: 'center' },
+    modalClose: { marginTop: 24, paddingTop: 16, alignItems: 'center' },
     currencyIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
     colorGrid: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-    colorCircle: { width: 48, height: 48, borderRadius: 24, elevation: 2 },
-    aboutSection: { alignItems: 'center', paddingVertical: 40, marginTop: 24 },
-    aboutLogoContainer: { width: 80, height: 80, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 16, elevation: 4 },
-    aboutLogo: { width: 60, height: 60, borderRadius: 12 },
-    aboutTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 4 },
-    aboutVersion: { fontSize: 13, marginBottom: 12 },
-    proBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 16 },
-    proBadgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
-    aboutCopyright: { fontSize: 11, textAlign: 'center', opacity: 0.7 }
+    colorCircle: { width: 48, height: 48, borderRadius: 24, elevation: 2 }
 });
 
 export default Settings;

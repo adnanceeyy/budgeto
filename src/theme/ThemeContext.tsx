@@ -12,15 +12,18 @@ interface ThemeContextType {
     setColorTheme: (colorTheme: ColorThemeType) => void;
     currency: string;
     setCurrency: (currency: string) => void;
+    soundEnabled: boolean;
+    setSoundEnabled: (enabled: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const systemScheme = useColorScheme();
-    const [theme, setThemeState] = useState<ThemeType>(systemScheme === 'light' ? 'light' : 'dark');
-    const [colorTheme, setColorThemeState] = useState<ColorThemeType>('purple');
+    const [theme, setThemeState] = useState<ThemeType>('dark');
+    const [colorTheme, setColorThemeState] = useState<ColorThemeType>('yellow');
     const [currency, setCurrencyState] = useState<string>('INR');
+    const [soundEnabled, setSoundEnabledState] = useState<boolean>(true);
 
     useEffect(() => {
         const loadSettings = async () => {
@@ -35,6 +38,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const savedCurrency = await AsyncStorage.getItem('user-currency');
             if (savedCurrency) {
                 setCurrencyState(savedCurrency);
+            }
+            const savedSound = await AsyncStorage.getItem('user-sound-enabled');
+            if (savedSound) {
+                setSoundEnabledState(savedSound === 'true');
             }
         };
         loadSettings();
@@ -60,6 +67,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         await AsyncStorage.setItem('user-currency', newCurrency);
     };
 
+    const setSoundEnabled = async (enabled: boolean) => {
+        setSoundEnabledState(enabled);
+        await AsyncStorage.setItem('user-sound-enabled', enabled ? 'true' : 'false');
+    };
+
     const colors = ColorPresets[colorTheme]?.[theme] || ColorPresets.purple[theme];
 
     return (
@@ -71,7 +83,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             setTheme,
             setColorTheme,
             currency,
-            setCurrency
+            setCurrency,
+            soundEnabled,
+            setSoundEnabled
         }}>
             {children}
         </ThemeContext.Provider>

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Platform, Image, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, Platform, Image, Pressable, Keyboard, KeyboardAvoidingView } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
 import { Camera, Mail, Phone, MapPin, Edit2, LogOut, ChevronLeft, User, Shield, Bell, Check, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ModalAlert from '../components/ModalAlert';
+import { dbService } from '../database/db';
 
-import * as ImagePicker from 'expo-image-picker';
+// import * as ImagePicker from 'expo-image-picker';
 
 const EditField = ({ icon: Icon, label, value, field, colors, onChange }: any) => (
     <View style={styles.editField}>
@@ -75,11 +77,11 @@ const Profile = ({ navigation }: any) => {
     };
 
     const loadStats = async () => {
-        const txs = await AsyncStorage.getItem('antigravity_transactions');
-        const cats = await AsyncStorage.getItem('antigravity_categories');
+        const txs = await dbService.getTransactions();
+        const cats = await dbService.getCategories();
         setStats({
-            categories: cats ? JSON.parse(cats).length : 4,
-            transactions: txs ? JSON.parse(txs).length : 0
+            categories: cats ? cats.length : 0,
+            transactions: txs ? txs.length : 0
         });
     };
 
@@ -91,34 +93,12 @@ const Profile = ({ navigation }: any) => {
     };
 
     const handlePickImage = async () => {
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            setAlertConfig({
-                visible: true,
-                title: 'Permission Required',
-                message: 'Budgeto needs access to your gallery to change your profile picture.',
-                type: 'error'
-            });
-            return;
-        }
-
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.7,
+        setAlertConfig({
+            visible: true,
+            title: 'Feature Unavailable',
+            message: 'Image selection is disabled in this slim version to keep the app size small.',
+            type: 'info'
         });
-
-        if (!result.canceled) {
-            const newUri = result.assets[0].uri;
-            setTempUser(prev => ({ ...prev, avatar: newUri }));
-            if (!isEditing) {
-                // Auto-save if not in editing mode
-                const updatedUser = { ...user, avatar: newUri };
-                setUser(updatedUser);
-                await AsyncStorage.setItem('user_profile', JSON.stringify(updatedUser));
-            }
-        }
     };
 
     const handleLogout = async () => {
@@ -141,36 +121,38 @@ const Profile = ({ navigation }: any) => {
             >
                 <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                        <SoundButton onPress={() => navigation.goBack()} style={styles.backBtn}>
                             <ChevronLeft color={colors.onSurface} size={24} />
-                        </TouchableOpacity>
+                        </SoundButton>
                         <Text style={[styles.title, { color: colors.onSurface }]}>
                             {isEditing ? 'System Identity' : 'My Core'}
                         </Text>
                         {isEditing ? (
-                            <TouchableOpacity onPress={handleSave}>
+                            <SoundButton onPress={handleSave}>
                                 <Check color={colors.primary} size={24} />
-                            </TouchableOpacity>
+                            </SoundButton>
                         ) : (
-                            <TouchableOpacity onPress={() => setIsEditing(true)}>
+                            <SoundButton onPress={() => setIsEditing(true)}>
                                 <Edit2 color={colors.onSurface} size={20} />
-                            </TouchableOpacity>
+                            </SoundButton>
                         )}
                     </View>
 
                     <View style={styles.avatarSection}>
-                        <TouchableOpacity onPress={handlePickImage} style={[styles.avatarContainer, { backgroundColor: colors.primaryContainer }]}>
-                            {tempUser.avatar ? (
-                                <Image source={{ uri: isEditing ? tempUser.avatar : user.avatar }} style={styles.avatarImage} />
-                            ) : (
-                                <Text style={[styles.avatarInitial, { color: colors.onPrimary }]}>
-                                    {user.name.split(' ').map(n => n[0]).join('')}
-                                </Text>
-                            )}
-                            <View style={[styles.cameraBtn, { backgroundColor: colors.primary }]}>
+                        <SoundButton onPress={handlePickImage} style={styles.avatarWrapper}>
+                            <View style={[styles.avatarContainer, { backgroundColor: colors.primaryContainer }]}>
+                                {tempUser.avatar ? (
+                                    <Image source={{ uri: isEditing ? tempUser.avatar : user.avatar }} style={styles.avatarImage} />
+                                ) : (
+                                    <Text style={[styles.avatarInitial, { color: colors.onPrimary }]}>
+                                        {user.name.split(' ').map(n => n[0]).join('')}
+                                    </Text>
+                                )}
+                            </View>
+                            <View style={[styles.cameraBtn, { backgroundColor: colors.primary, borderColor: colors.background }]}>
                                 <Camera size={16} color={colors.onPrimary} />
                             </View>
-                        </TouchableOpacity>
+                        </SoundButton>
                         {!isEditing && (
                             <>
                                 <Text style={[styles.userName, { color: colors.onSurface }]}>{user.name}</Text>
@@ -214,12 +196,12 @@ const Profile = ({ navigation }: any) => {
                                 onChange={(text: string) => setTempUser(prev => ({ ...prev, location: text }))}
                             />
 
-                            <TouchableOpacity
+                            <SoundButton
                                 style={[styles.cancelBtn, { borderColor: colors.outline }]}
                                 onPress={() => { setIsEditing(false); setTempUser(user); }}
                             >
                                 <Text style={{ color: colors.onSurface, fontWeight: 'bold' }}>Abort Changes</Text>
-                            </TouchableOpacity>
+                            </SoundButton>
                         </View>
                     ) : (
                         <>
@@ -237,20 +219,19 @@ const Profile = ({ navigation }: any) => {
 
                             <View style={styles.section}>
                                 <Text style={[styles.sectionTitle, { color: colors.primary }]}>Node Integrity</Text>
-                                <ProfileItem icon={Mail} label="Comms" value={user.email} colors={colors} />
                                 <ProfileItem icon={Phone} label="Secure" value={user.phone} colors={colors} />
                                 <ProfileItem icon={MapPin} label="Zone" value={user.location} colors={colors} />
                             </View>
                         </>
                     )}
 
-                    <TouchableOpacity
+                    <SoundButton
                         style={[styles.logoutBtn, { borderColor: isDark ? '#F2B8B5' : '#B3261E' }]}
                         onPress={handleLogout}
                     >
                         <LogOut color={isDark ? '#F2B8B5' : '#B3261E'} size={20} />
                         <Text style={[styles.logoutText, { color: isDark ? '#F2B8B5' : '#B3261E' }]}>Disconnect</Text>
-                    </TouchableOpacity>
+                    </SoundButton>
                 </ScrollView>
             </KeyboardAvoidingView>
 
@@ -272,10 +253,11 @@ const styles = StyleSheet.create({
     title: { fontSize: 24, fontWeight: '400', letterSpacing: -0.5 },
     backBtn: { padding: 4 },
     avatarSection: { alignItems: 'center', marginTop: 20, marginBottom: 32 },
-    avatarContainer: { width: 120, height: 120, borderRadius: 60, justifyContent: 'center', alignItems: 'center', position: 'relative', overflow: 'hidden' },
+    avatarWrapper: { position: 'relative', width: 120, height: 120 },
+    avatarContainer: { width: 120, height: 120, borderRadius: 60, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
     avatarInitial: { fontSize: 40, fontWeight: 'bold' },
     avatarImage: { width: 120, height: 120, borderRadius: 60 },
-    cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 4 },
+    cameraBtn: { position: 'absolute', bottom: 0, right: 0, width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', elevation: 4, borderWidth: 3 },
     userName: { fontSize: 24, fontWeight: '600', marginTop: 16 },
     userEmail: { fontSize: 14, marginTop: 4 },
     statsCard: { marginHorizontal: 24, padding: 20, borderRadius: 28, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', marginBottom: 32 },

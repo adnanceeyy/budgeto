@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { StyleSheet, View, Platform, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { Home, List, PieChart, Settings, Calendar as CalIcon, Landmark } from 'lucide-react-native';
 import Dashboard from '../screens/Dashboard';
 import AddTransaction from '../screens/AddTransaction';
@@ -15,9 +16,13 @@ import DebtScreen from '../screens/DebtScreen';
 import { useTheme } from '../theme/ThemeContext';
 import ReminderSettings from '../screens/ReminderSettings';
 import ManageCategories from '../screens/ManageCategories';
+import SecurityCenter from '../screens/SecurityCenter';
+import AboutBudgeto from '../screens/AboutBudgeto';
+import DeveloperSupport from '../screens/DeveloperSupport';
+import ManageAccounts from '../screens/ManageAccounts';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+// import * as Notifications from 'expo-notifications';
 import { useNavigation } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
@@ -100,27 +105,9 @@ const ChangePasscodeWrapper = ({ navigation, ...props }: any) => {
     );
 };
 
-const NotificationHandler = () => {
-    const navigation = useNavigation<any>();
-
-    React.useEffect(() => {
-        const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-            const screen = response.notification.request.content.data?.screen;
-            if (screen === 'AddTransaction') {
-                navigation.navigate('AddTransaction');
-            }
-        });
-
-        return () => subscription.remove();
-    }, [navigation]);
-
-    return null;
-};
-
 const MainNavigator = () => {
     return (
         <NavigationContainer>
-            <NotificationHandler />
             <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="MainTabs" component={TabNavigator} />
                 <Stack.Screen
@@ -157,6 +144,26 @@ const MainNavigator = () => {
                     name="ManageCategories"
                     component={ManageCategories}
                     options={{ animation: 'slide_from_right' }}
+                />
+                <Stack.Screen
+                    name="ManageAccounts"
+                    component={ManageAccounts}
+                    options={{ animation: 'slide_from_right' }}
+                />
+                <Stack.Screen
+                    name="SecurityCenter"
+                    component={SecurityCenter}
+                    options={{ animation: 'slide_from_right' }}
+                />
+                <Stack.Screen
+                    name="AboutBudgeto"
+                    component={AboutBudgeto}
+                    options={{ animation: 'slide_from_bottom' }}
+                />
+                <Stack.Screen
+                    name="DeveloperSupport"
+                    component={DeveloperSupport}
+                    options={{ animation: 'slide_from_bottom' }}
                 />
             </Stack.Navigator>
         </NavigationContainer>

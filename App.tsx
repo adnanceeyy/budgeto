@@ -7,9 +7,10 @@ import { initDatabase } from './src/database/db';
 import Onboarding from './src/screens/Onboarding';
 import PasscodeScreen from './src/screens/PasscodeScreen';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { View, ActivityIndicator, StyleSheet, Modal, Text, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Modal, Text, Pressable } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { XCircle } from 'lucide-react-native';
+import { XCircle, Fingerprint } from 'lucide-react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 function AppContent() {
   const { colors, theme } = useTheme();
@@ -29,12 +30,17 @@ function AppContent() {
 
         const onboardingDone = await AsyncStorage.getItem('onboarding_done');
         const savedPasscode = await AsyncStorage.getItem('user_passcode');
+        const useBiometrics = await AsyncStorage.getItem('use_biometrics');
 
         if (!onboardingDone) {
           setShowOnboarding(true);
         } else if (savedPasscode) {
           setHasPasscode(true);
           setIsLocked(true);
+
+          if (useBiometrics === 'true') {
+            triggerBiometricAuth(); // Don't await this, let UI render locked state while it prompts
+          }
         }
 
         setLoading(false);
@@ -46,6 +52,27 @@ function AppContent() {
     }
     setup();
   }, []);
+
+  const triggerBiometricAuth = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const hasRecords = await LocalAuthentication.isEnrolledAsync();
+
+      if (hasHardware && hasRecords) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Unlock Budgeto',
+          fallbackLabel: 'Use App Passcode',
+          cancelLabel: 'Use App Passcode',
+          disableDeviceFallback: true,
+        });
+        if (result.success) {
+          setIsLocked(false);
+        }
+      }
+    } catch (e) {
+      console.log("Biometric error", e);
+    }
+  };
 
   const handleOnboardingFinish = async () => {
     await AsyncStorage.setItem('onboarding_done', 'true');
@@ -84,7 +111,16 @@ function AppContent() {
       <SafeAreaProvider>
         <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
         {isLocked ? (
-          <PasscodeScreen onComplete={handleUnlock} title="Welcome Back" />
+          <View style={{ flex: 1 }}>
+            <PasscodeScreen onComplete={handleUnlock} title="Welcome Back" />
+            <Pressable
+              style={({ pressed }) => [{ position: 'absolute', bottom: 50, alignSelf: 'center', alignItems: 'center', opacity: pressed ? 0.6 : 0.8 }]}
+              onPress={triggerBiometricAuth}
+            >
+              <Fingerprint size={32} color={isDark ? '#D0BCFF' : '#6750A4'} />
+              <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', marginTop: 8, fontWeight: '500' }}>Use Face/Touch ID</Text>
+            </Pressable>
+          </View>
         ) : (
           <MainNavigator />
         )}
@@ -96,12 +132,12 @@ function AppContent() {
               <XCircle color="#B3261E" size={48} />
               <Text style={[styles.errorTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Access Denied</Text>
               <Text style={[styles.errorText, { color: isDark ? '#CAC4D0' : '#49454F' }]}>The passcode you entered is incorrect. Please try again.</Text>
-              <TouchableOpacity
-                style={[styles.errorBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}
+              <Pressable
+                style={({ pressed }) => [styles.errorBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4', opacity: pressed ? 0.7 : 1 }]}
                 onPress={() => setShowErrorModal(false)}
               >
                 <Text style={[styles.errorBtnText, { color: isDark ? '#381E72' : '#FFFFFF' }]}>Try Again</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
         </Modal>

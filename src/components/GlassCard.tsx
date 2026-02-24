@@ -1,10 +1,10 @@
 import React from 'react';
-import { StyleSheet, View, ViewStyle, Platform } from 'react-native';
+import { StyleSheet, View, ViewStyle, Platform, StyleProp } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 
 interface GlassCardProps {
     children: React.ReactNode;
-    style?: ViewStyle;
+    style?: StyleProp<ViewStyle>;
     cornerRadius?: number;
 }
 
@@ -36,23 +36,9 @@ const GlassCard = ({ children, style, cornerRadius = 24 }: GlassCardProps) => {
 const styles = StyleSheet.create({
     card: {
         overflow: 'hidden',
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 4 },
-                shadowOpacity: 0.1,
-                shadowRadius: 8,
-            },
-            android: {
-                elevation: 3,
-            },
-            web: {
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-            }
-        }),
     },
     content: {
-        padding: 20,
+        padding: 24,
     },
 });
 

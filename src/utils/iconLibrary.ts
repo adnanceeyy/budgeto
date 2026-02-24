@@ -14,7 +14,7 @@ import {
     Gauge, Ghost, Gift as GiftIcon, GlassWater, GraduationCap, Grape,
     Guitar, Hammer, HandMetal, HardDrive, Headphones, Headset, Heart as HeartIcon,
     History, Hop, IceCream, Image, Infinity, Instagram, Joystick, Key,
-    Keyboard, Laptop, Leaf, Library, Lightbulb, LineChart, Link,
+    Keyboard, Landmark, Laptop, Leaf, Library, Lightbulb, LineChart, Link,
     Linkedin, Locate, Lock, Luggage, Magnet, Mail, Map, MapPin, Martini,
     Medal, Megaphone, Menu, MessageCircle, MessageSquare, Mic, Microscope,
     Microwave, Milk, Milestone, Moon, Mountain, Mouse, Music, Network,
@@ -308,6 +308,7 @@ export const CATEGORY_ICONS: { [key: string]: any } = {
     'x': X,
     'x-circle': XCircle,
     'youtube': Youtube,
+    'landmark': Landmark,
     'zap-alt': ZapIcon,
     'zoom-in': ZoomIn,
     'zoom-out': ZoomOut

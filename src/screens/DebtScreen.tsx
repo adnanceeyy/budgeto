@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, TextInput, Modal, FlatList, TouchableWithoutFeedback, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, TextInput, Modal, FlatList, Pressable, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import Animated, { FadeInDown, FadeInUp, Layout, FadeIn } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
@@ -8,6 +9,8 @@ import { dbService } from '../database/db';
 import * as Haptics from 'expo-haptics';
 import { format } from 'date-fns';
 import ModalAlert from '../components/ModalAlert';
+// import * as Contacts from 'expo-contacts';
+import { Contact as ContactIcon } from 'lucide-react-native';
 
 const DebtScreen = ({ navigation }: any) => {
     const { theme, currency } = useTheme();
@@ -65,6 +68,15 @@ const DebtScreen = ({ navigation }: any) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => { });
     };
 
+    const pickContact = async () => {
+        setAlertConfig({
+            visible: true,
+            title: 'Feature Unavailable',
+            message: 'Contact selection is disabled in this slim version to keep the app size small.',
+            type: 'info'
+        });
+    };
+
     const confirmDelete = (id: number) => {
         setAlertConfig({
             visible: true,
@@ -89,7 +101,7 @@ const DebtScreen = ({ navigation }: any) => {
                 <View style={styles.cardHeader}>
                     <Text style={[styles.personName, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{item.person}</Text>
                     <Text style={[styles.amountText, { color: item.type === 'owed_to_me' ? '#146C2E' : '#B3261E' }]}>
-                        {item.type === 'owed_to_me' ? '+' : '-'}{symbol}{item.amount.toLocaleString()}
+                        {item.type === 'owed_to_me' ? '+' : '-'}{symbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                 </View>
                 <Text style={[styles.noteText, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{item.note || 'No description'}</Text>
@@ -99,12 +111,12 @@ const DebtScreen = ({ navigation }: any) => {
                         <Text style={[styles.dateText, { color: isDark ? '#CAC4D0' : '#49454F' }]}>{format(new Date(item.date), 'MMM dd, yyyy')}</Text>
                     </View>
                     <View style={styles.actions}>
-                        <TouchableOpacity onPress={() => toggleStatus(item.id, item.status)} style={[styles.actionBtn, { backgroundColor: item.status === 'settled' ? '#146C2E' : (isDark ? '#2B2930' : '#EADDFF') }]}>
+                        <SoundButton onPress={() => toggleStatus(item.id, item.status)} style={[styles.actionBtn, { backgroundColor: item.status === 'settled' ? '#146C2E' : (isDark ? '#2B2930' : '#EADDFF') }]}>
                             <Check size={16} color={item.status === 'settled' ? '#FFFFFF' : (isDark ? '#D0BCFF' : '#6750A4')} />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => confirmDelete(item.id)} style={[styles.actionBtn, { backgroundColor: isDark ? '#311110' : '#F9DEDC' }]}>
+                        </SoundButton>
+                        <SoundButton onPress={() => confirmDelete(item.id)} style={[styles.actionBtn, { backgroundColor: isDark ? '#311110' : '#F9DEDC' }]}>
                             <Trash2 size={16} color={isDark ? '#F2B8B5' : '#B3261E'} />
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
                 </View>
             </View>
@@ -115,25 +127,25 @@ const DebtScreen = ({ navigation }: any) => {
         <Background>
             <View style={styles.container}>
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+                    <SoundButton onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <ChevronLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
-                    </TouchableOpacity>
+                    </SoundButton>
                     <Text style={[styles.title, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Debt Center</Text>
-                    <TouchableOpacity onPress={() => setShowAddModal(true)} style={[styles.addBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
+                    <SoundButton onPress={() => setShowAddModal(true)} style={[styles.addBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
                         <Plus color={isDark ? '#381E72' : '#FFFFFF'} size={24} />
-                    </TouchableOpacity>
+                    </SoundButton>
                 </View>
 
                 <View style={styles.statsRow}>
                     <View style={[styles.statCard, { backgroundColor: isDark ? '#1D1B20' : '#E6F4EA' }]}>
                         <TrendingUp size={20} color="#146C2E" />
                         <Text style={[styles.statLabel, { color: isDark ? '#CAC4D0' : '#146C2E' }]}>Owed to me</Text>
-                        <Text style={[styles.statValue, { color: '#146C2E' }]}>{symbol}{totalOwedToMe.toLocaleString()}</Text>
+                        <Text style={[styles.statValue, { color: '#146C2E' }]}>{symbol}{totalOwedToMe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                     <View style={[styles.statCard, { backgroundColor: isDark ? '#1D1B20' : '#FCE8E6' }]}>
                         <TrendingDown size={20} color="#B3261E" />
                         <Text style={[styles.statLabel, { color: isDark ? '#CAC4D0' : '#B3261E' }]}>I owe</Text>
-                        <Text style={[styles.statValue, { color: '#B3261E' }]}>{symbol}{totalIOwe.toLocaleString()}</Text>
+                        <Text style={[styles.statValue, { color: '#B3261E' }]}>{symbol}{totalIOwe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                     </View>
                 </View>
 
@@ -156,24 +168,24 @@ const DebtScreen = ({ navigation }: any) => {
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                         style={{ flex: 1 }}
                     >
-                        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-                            <View style={styles.modalOverlay}>
-                                <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
-                                    <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Record Debt</Text>
+                        <View style={styles.modalOverlay}>
+                            <View style={[styles.modalCard, { backgroundColor: isDark ? '#2B2930' : '#FFFFFF' }]}>
+                                <Text style={[styles.modalTitle, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>Record Debt</Text>
+                                <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
                                     <View style={styles.typeToggle}>
-                                        <TouchableOpacity
+                                        <SoundButton
                                             style={[styles.toggleBtn, newDebt.type === 'owed_to_me' && { backgroundColor: '#146C2E' }]}
                                             onPress={() => setNewDebt({ ...newDebt, type: 'owed_to_me' })}
                                         >
                                             <Text style={[styles.toggleText, { color: newDebt.type === 'owed_to_me' ? '#FFFFFF' : '#146C2E' }]}>Owed to me</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
+                                        </SoundButton>
+                                        <SoundButton
                                             style={[styles.toggleBtn, newDebt.type === 'i_owe' && { backgroundColor: '#B3261E' }]}
                                             onPress={() => setNewDebt({ ...newDebt, type: 'i_owe' })}
                                         >
                                             <Text style={[styles.toggleText, { color: newDebt.type === 'i_owe' ? '#FFFFFF' : '#B3261E' }]}>I owe</Text>
-                                        </TouchableOpacity>
+                                        </SoundButton>
                                     </View>
 
                                     <View style={styles.inputGroup}>
@@ -185,6 +197,12 @@ const DebtScreen = ({ navigation }: any) => {
                                             value={newDebt.person}
                                             onChangeText={text => setNewDebt({ ...newDebt, person: text })}
                                         />
+                                        <SoundButton
+                                            onPress={pickContact}
+                                            style={[styles.contactPickerBtn, { backgroundColor: isDark ? '#49454F' : '#E7E0EC' }]}
+                                        >
+                                            <ContactIcon size={18} color={isDark ? '#D0BCFF' : '#6750A4'} />
+                                        </SoundButton>
                                     </View>
 
                                     <View style={styles.inputGroup}>
@@ -211,18 +229,18 @@ const DebtScreen = ({ navigation }: any) => {
                                             onChangeText={text => setNewDebt({ ...newDebt, note: text })}
                                         />
                                     </View>
-
                                     <View style={styles.modalActions}>
-                                        <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.cancelBtn}>
+                                        <SoundButton onPress={() => setShowAddModal(false)} style={styles.cancelBtn}>
                                             <Text style={{ color: isDark ? '#E6E1E5' : '#1C1B1F', fontWeight: 'bold' }}>Cancel</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={handleAddDebt} style={[styles.confirmBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
+                                        </SoundButton>
+                                        <SoundButton onPress={handleAddDebt} style={[styles.confirmBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}>
                                             <Text style={{ color: isDark ? '#381E72' : '#FFFFFF', fontWeight: 'bold' }}>Save Record</Text>
-                                        </TouchableOpacity>
+                                        </SoundButton>
                                     </View>
-                                </View>
+                                    <View style={{ height: 40 }} />
+                                </ScrollView>
                             </View>
-                        </TouchableWithoutFeedback>
+                        </View>
                     </KeyboardAvoidingView>
                 </Modal>
 
@@ -234,8 +252,8 @@ const DebtScreen = ({ navigation }: any) => {
                     onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
                     onConfirm={alertConfig.onConfirm}
                 />
-            </View>
-        </Background>
+            </View >
+        </Background >
     );
 };
 
@@ -264,14 +282,15 @@ const styles = StyleSheet.create({
     actionBtn: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
     empty: { marginTop: 100, alignItems: 'center', gap: 16 },
     emptyText: { fontSize: 16, fontWeight: '500' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalCard: { borderTopLeftRadius: 32, borderTopRightRadius: 32, padding: 32 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+    modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, elevation: 12, maxHeight: '85%' },
     modalTitle: { fontSize: 24, fontWeight: '400', marginBottom: 32 },
     typeToggle: { flexDirection: 'row', gap: 12, marginBottom: 24 },
     toggleBtn: { flex: 1, paddingVertical: 12, borderRadius: 20, borderWidth: 1.5, borderColor: 'transparent', alignItems: 'center' },
     toggleText: { fontWeight: '700', fontSize: 13 },
     inputGroup: { flexDirection: 'row', alignItems: 'center', gap: 16, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 16, paddingHorizontal: 16, marginVertical: 8 },
     input: { flex: 1, paddingVertical: 14, fontSize: 16 },
+    contactPickerBtn: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 8 },
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 32 },
     cancelBtn: { padding: 16 },
     confirmBtn: { paddingHorizontal: 32, paddingVertical: 16, borderRadius: 16 }

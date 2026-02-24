@@ -1,8 +1,8 @@
 const BaseColors = {
     purple: '#6750A4',
     ocean: '#0061A4',
-    emerald: '#006D3B',
-    crimson: '#BA1A1A',
+    yellow: '#8C6C0A',
+    ruby: '#8C1D18',
 };
 
 export const ColorPresets: any = {
@@ -62,37 +62,37 @@ export const ColorPresets: any = {
             accent: '#3482F6',
         }
     },
-    emerald: {
+    yellow: {
         light: {
-            primary: '#006D3B',
+            primary: '#775A00',
             onPrimary: '#FFFFFF',
-            primaryContainer: '#98F7B5',
-            background: '#FBFDF8',
-            surface: '#FBFDF8',
-            surfaceVariant: '#DDE5D9',
-            onSurface: '#191C19',
-            onSurfaceVariant: '#414941',
-            outline: '#727970',
-            card: '#ECF5ED',
-            accent: '#006D3B',
+            primaryContainer: '#FFE07F',
+            background: '#FFFBFF',
+            surface: '#FFFBFF',
+            surfaceVariant: '#EAE1D0',
+            onSurface: '#1E1B16',
+            onSurfaceVariant: '#4B4639',
+            outline: '#7C7767',
+            card: '#FFF0C6',
+            accent: '#775A00',
         },
         dark: {
-            primary: '#2B9E5A',
-            onPrimary: '#FFFFFF',
-            primaryContainer: '#00522E',
-            background: '#0B0D0B',
-            surface: '#0E110F',
-            surfaceVariant: '#2B312B',
-            onSurface: '#E1E3DE',
-            onSurfaceVariant: '#C1C9BE',
-            outline: '#8B9389',
-            card: '#131D14',
-            accent: '#2B9E5A',
+            primary: '#ECC248',
+            onPrimary: '#3E2E00',
+            primaryContainer: '#5A4300',
+            background: '#1E1B16',
+            surface: '#14130E',
+            surfaceVariant: '#4B4639',
+            onSurface: '#E8E2D9',
+            onSurfaceVariant: '#CFC5B4',
+            outline: '#989080',
+            card: '#242017',
+            accent: '#ECC248',
         }
     },
-    crimson: {
+    ruby: {
         light: {
-            primary: '#BA1A1A',
+            primary: '#9C413D',
             onPrimary: '#FFFFFF',
             primaryContainer: '#FFDAD6',
             background: '#FFF8F7',
@@ -102,24 +102,24 @@ export const ColorPresets: any = {
             onSurfaceVariant: '#534341',
             outline: '#857371',
             card: '#FCEAE8',
-            accent: '#BA1A1A',
+            accent: '#9C413D',
         },
         dark: {
-            primary: '#E53935',
-            onPrimary: '#FFFFFF',
-            primaryContainer: '#93000A',
-            background: '#0F0908',
+            primary: '#FFB4AB',
+            onPrimary: '#5F1414',
+            primaryContainer: '#7D2A28',
+            background: '#201A19',
             surface: '#110D0C',
-            surfaceVariant: '#352A28',
+            surfaceVariant: '#534341',
             onSurface: '#EDE0DE',
             onSurfaceVariant: '#D8C2BF',
             outline: '#A08C8A',
-            card: '#1C1514',
-            accent: '#E53935',
+            card: '#2D1F1D',
+            accent: '#FFB4AB',
         }
     }
 };
 
 export type ThemeType = 'light' | 'dark';
-export type ColorThemeType = 'purple' | 'ocean' | 'emerald' | 'crimson';
+export type ColorThemeType = 'purple' | 'ocean' | 'yellow' | 'ruby';
 export const BaseThemeColors = BaseColors;

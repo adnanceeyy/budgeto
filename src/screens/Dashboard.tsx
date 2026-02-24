@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Dimensions, Platform, Modal } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Dimensions, Platform, Modal, Switch } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { LineChart } from 'react-native-gifted-charts';
 import { useTheme } from '../theme/ThemeContext';
 import { ColorPresets } from '../theme/colors';
-import { Wallet, TrendingUp, TrendingDown, Plus, Menu, X, Landmark, PieChart as PieIcon, Shield, Info, Target, Landmark as DebtIcon, ReceiptText, History, User, Calendar as CalIcon, Sparkles, DollarSign, Palette } from 'lucide-react-native';
+import { Wallet, TrendingUp, TrendingDown, Plus, Menu, X, Landmark as DebtIcon, Landmark, PieChart as PieIcon, Shield, Info, Target, ReceiptText, History, User, Calendar as CalIcon, Sparkles, DollarSign, Palette, Settings2, Settings } from 'lucide-react-native';
 import { dbService } from '../database/db';
 import { CATEGORY_ICONS } from '../utils/iconLibrary';
-import * as Haptics from 'expo-haptics';
 import { format, subDays } from 'date-fns';
 import GlassCard from '../components/GlassCard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,12 +16,12 @@ import ModalAlert from '../components/ModalAlert';
 
 const { width } = Dimensions.get('window');
 
-const AnimatedValue = ({ value, symbol, style }: { value: number, symbol: string, style: any }) => {
+const AnimatedValue = ({ value, symbol, style, adjustSize = false }: { value: number, symbol: string, style: any, adjustSize?: boolean }) => {
     const [displayValue, setDisplayValue] = useState(0);
 
     useEffect(() => {
         let startValue = displayValue === value ? 0 : displayValue;
-        const duration = 1500;
+        const duration = 600;
         const frames = 60;
         const frameTime = duration / frames;
         let frame = 0;
@@ -30,7 +30,7 @@ const AnimatedValue = ({ value, symbol, style }: { value: number, symbol: string
             frame++;
             const progress = frame / frames;
             const easeOutExpo = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
-            const current = Math.floor(startValue + (value - startValue) * easeOutExpo);
+            const current = startValue + (value - startValue) * easeOutExpo;
 
             setDisplayValue(current);
             if (frame === frames) clearInterval(timer);
@@ -39,7 +39,19 @@ const AnimatedValue = ({ value, symbol, style }: { value: number, symbol: string
         return () => clearInterval(timer);
     }, [value]);
 
-    return <Text style={style}>{symbol}{displayValue.toLocaleString()}</Text>;
+    // Auto-scale font size for very large numbers
+    const getScaledStyle = () => {
+        const flattened = StyleSheet.flatten(style);
+        if (!adjustSize) return flattened;
+        const length = (symbol + displayValue.toLocaleString()).length;
+        let fontSize = flattened.fontSize || 42;
+        if (length > 15) fontSize = 28;
+        else if (length > 12) fontSize = 32;
+        else if (length > 10) fontSize = 36;
+        return { ...flattened, fontSize };
+    };
+
+    return <Text style={getScaledStyle()} numberOfLines={1} adjustsFontSizeToFit>{symbol}{displayValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>;
 };
 
 const Dashboard = ({ navigation }: any) => {
@@ -49,11 +61,31 @@ const Dashboard = ({ navigation }: any) => {
     const [expense, setExpense] = useState(0);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [chartData, setChartData] = useState<any[]>([]);
+    const [accounts, setAccounts] = useState<any[]>([]);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [user, setUser] = useState<any>(null);
     const [alertConfig, setAlertConfig] = useState({
         visible: false, title: '', message: '', type: 'info' as any
     });
+    const [budgetHealth, setBudgetHealth] = useState<any[]>([]);
+    const [showTour, setShowTour] = useState(false);
+    const [tourStep, setTourStep] = useState(0);
+    const [showWidgetEditor, setShowWidgetEditor] = useState(false);
+    const [widgets, setWidgets] = useState({
+        balance: true,
+        shortcuts: true,
+        analytics: true,
+        recent: true,
+        health: true
+    });
+
+    const WIDGET_META = {
+        balance: { title: 'Net Asset Vault', icon: Wallet, desc: 'Shows your total balance and cash flow overview.' },
+        shortcuts: { title: 'Quick Action Hub', icon: Target, desc: 'Instant access to add debt or check insights.' },
+        analytics: { title: 'Expense Analytics', icon: TrendingUp, desc: 'Visualize your spending patterns over time.' },
+        recent: { title: 'Transaction Stream', icon: History, desc: 'A live feed of your most recent transactions.' },
+        health: { title: 'Budget Health Pulse', icon: Shield, desc: 'Monitor how much budget is left in your categories.' }
+    };
 
     const currencySymbols: { [key: string]: string } = {
         'INR': '₹', 'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥'
@@ -63,58 +95,146 @@ const Dashboard = ({ navigation }: any) => {
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', loadData);
         loadData();
+        checkTourAndWidgets();
         return unsubscribe;
     }, [navigation]);
 
-    const loadData = async () => {
-        const txs = await dbService.getTransactions();
-        setTransactions(txs.slice(0, 5));
-
-        let totalIn = 0;
-        let totalOut = 0;
-        txs.forEach((t: any) => {
-            if (t.type === 'income') totalIn += t.amount;
-            else totalOut += t.amount;
-        });
-        setIncome(totalIn);
-        setExpense(totalOut);
-        setBalance(totalIn - totalOut);
-
-        const dailyData: { [key: string]: number } = {};
-        for (let i = 6; i >= 0; i--) {
-            const dateStr = format(subDays(new Date(), i), 'yyyy-MM-dd');
-            dailyData[dateStr] = 0;
-        }
-
-        txs.forEach((t: any) => {
-            const dateStr = format(new Date(t.date), 'yyyy-MM-dd');
-            if (dailyData[dateStr] !== undefined && t.type === 'expense') {
-                dailyData[dateStr] += t.amount;
+    const checkTourAndWidgets = async () => {
+        try {
+            const done = await AsyncStorage.getItem('app_tour_done_v1');
+            if (done !== 'true') {
+                setShowTour(true);
             }
-        });
-
-        const formattedChart = Object.keys(dailyData).map(date => ({
-            value: dailyData[date],
-            label: format(new Date(date), 'dd'),
-            dataPointText: dailyData[date] > 0 ? (dailyData[date] > 999 ? `${(dailyData[date] / 1000).toFixed(1)}k` : `${Math.round(dailyData[date])}`) : '',
-        }));
-
-        if (formattedChart.length === 0) {
-            setChartData([{ value: 0, label: '' }, { value: 0, label: '' }]);
-        } else {
-            setChartData(formattedChart);
+            const wg = await AsyncStorage.getItem('dashboard_widgets_v1');
+            if (wg) {
+                setWidgets(JSON.parse(wg));
+            }
+        } catch (e) {
+            console.log(e);
         }
+    };
 
-        const profileStr = await AsyncStorage.getItem('user_profile');
-        if (profileStr) {
-            setUser(JSON.parse(profileStr));
+    const handleNextTourStep = async () => {
+        if (tourStep < 3) {
+            setTourStep(tourStep + 1);
+        } else {
+            setShowTour(false);
+            try {
+                await AsyncStorage.setItem('app_tour_done_v1', 'true');
+            } catch (e) { }
+        }
+    };
+
+    const toggleWidget = async (key: keyof typeof widgets) => {
+        const newW = { ...widgets, [key]: !widgets[key] };
+        setWidgets(newW);
+        try {
+            await AsyncStorage.setItem('dashboard_widgets_v1', JSON.stringify(newW));
+        } catch (e) { }
+    };
+
+    const loadData = async () => {
+        try {
+            const txs = await dbService.getTransactions();
+            setTransactions(txs.slice(0, 5) || []);
+
+            const accs = await dbService.getAccounts();
+            setAccounts(accs || []);
+
+            const includedAccountIds = (accs || []).filter((a: any) => a.include_in_total === undefined || a.include_in_total === 1).map((a: any) => a.id);
+
+            let totalIn = 0;
+            let totalOut = 0;
+            let currentBalance = 0;
+
+            if (accs && accs.length > 0) {
+                accs.forEach((a: any) => {
+                    if (a.include_in_total === undefined || a.include_in_total === 1) {
+                        currentBalance += a.balance || 0;
+                    }
+                });
+            }
+
+            txs.forEach((t: any) => {
+                if (t.account_id && !includedAccountIds.includes(t.account_id)) {
+                    return; // Skip transaction stats if account is omitted
+                }
+
+                const amt = t.amount || 0;
+                if (t.type === 'income') totalIn += amt;
+                else totalOut += amt;
+            });
+
+            setIncome(totalIn);
+            setExpense(totalOut);
+
+            // if accounts exist, use exact sum, otherwise use txs derived balance
+            setBalance(accs.length > 0 ? currentBalance : totalIn - totalOut);
+
+            const dailyData: { [key: string]: number } = {};
+            for (let i = 6; i >= 0; i--) {
+                const dateStr = format(subDays(new Date(), i), 'yyyy-MM-dd');
+                dailyData[dateStr] = 0;
+            }
+
+            txs.forEach((t: any) => {
+                if (!t.date) return;
+                const dateStr = format(new Date(t.date), 'yyyy-MM-dd');
+                if (dailyData[dateStr] !== undefined && t.type === 'expense') {
+                    dailyData[dateStr] += t.amount || 0;
+                }
+            });
+
+            const formattedChart = Object.keys(dailyData).map(date => ({
+                value: dailyData[date],
+                label: format(new Date(date), 'dd'),
+                dataPointText: dailyData[date] > 0 ? (dailyData[date] > 999 ? `${(dailyData[date] / 1000).toFixed(1)}k` : `${Math.round(dailyData[date])}`) : '',
+            }));
+
+            if (formattedChart.length === 0) {
+                setChartData([{ value: 0, label: '' }, { value: 0, label: '' }]);
+            } else {
+                setChartData(formattedChart);
+            }
+
+            const profileStr = await AsyncStorage.getItem('user_profile');
+            if (profileStr) {
+                try {
+                    setUser(JSON.parse(profileStr));
+                } catch (pe) {
+                    console.error("Profile parse error", pe);
+                }
+            }
+
+            const cats = await dbService.getCategories();
+            const monthlySpent: { [key: number]: number } = {};
+            const now = new Date();
+            const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+            const monthTxs = await dbService.getTransactions();
+            monthTxs.forEach((t: any) => {
+                if (t.date >= mStart && t.type === 'expense') {
+                    monthlySpent[t.category_id] = (monthlySpent[t.category_id] || 0) + t.amount;
+                }
+            });
+
+            const health = cats.filter((c: any) => c.budget > 0).map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                budget: c.budget,
+                spent: monthlySpent[c.id] || 0,
+                color: c.color
+            }));
+            setBudgetHealth(health);
+        } catch (error) {
+            console.error("Dashboard loadData error:", error);
         }
     };
 
     const isDark = theme === 'dark';
 
     const MenuItem = ({ icon: Icon, label, route, tab, alertText }: any) => (
-        <TouchableOpacity
+        <SoundButton
             style={styles.menuItem}
             onPress={() => {
                 setIsMenuOpen(false);
@@ -132,16 +252,16 @@ const Dashboard = ({ navigation }: any) => {
                 <Icon color={colors.primary} size={22} />
             </View>
             <Text style={[styles.menuText, { color: colors.onSurface }]}>{label}</Text>
-        </TouchableOpacity>
+        </SoundButton>
     );
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>
             <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 <Animated.View entering={FadeInUp.delay(100).duration(600)} style={styles.header}>
-                    <TouchableOpacity onPress={() => setIsMenuOpen(true)} style={styles.menuTrigger}>
+                    <SoundButton onPress={() => setIsMenuOpen(true)} style={styles.menuTrigger}>
                         <Menu color={colors.onSurface} size={28} />
-                    </TouchableOpacity>
+                    </SoundButton>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Image
                             source={require('../../assets/icon.png')}
@@ -149,7 +269,7 @@ const Dashboard = ({ navigation }: any) => {
                         />
                         <Text style={[styles.userName, { color: colors.onSurface }]}>Budgeto Hub</Text>
                     </View>
-                    <TouchableOpacity
+                    <SoundButton
                         style={styles.profileBox}
                         onPress={() => navigation.navigate('Profile')}
                     >
@@ -162,142 +282,205 @@ const Dashboard = ({ navigation }: any) => {
                                 </Text>
                             )}
                         </View>
-                    </TouchableOpacity>
+                    </SoundButton>
                 </Animated.View>
 
                 {/* Balance Card */}
-                <Animated.View entering={FadeInDown.delay(200).duration(800)} style={[styles.assetCard, { backgroundColor: colors.primary }]}>
-                    <View style={styles.cardHeader}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={[styles.cardTag, { color: 'rgba(255,255,255,0.7)' }]}>NET LIQUIDITY</Text>
-                            <Sparkles size={14} color="rgba(255,255,255,0.8)" />
+                {widgets.balance && (
+                    <Animated.View entering={FadeInDown.delay(200).duration(800)} style={[styles.assetCard, { backgroundColor: colors.primary }]}>
+                        <View style={styles.cardHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={[styles.cardTag, { color: 'rgba(255,255,255,0.7)' }]}>NET LIQUIDITY</Text>
+                                <Sparkles size={14} color="rgba(255,255,255,0.8)" />
+                            </View>
+                            <Wallet color="#FFFFFF" size={20} />
                         </View>
-                        <Wallet color="#FFFFFF" size={20} />
-                    </View>
-                    <AnimatedValue
-                        value={balance}
-                        symbol={symbol}
-                        style={[styles.balanceText, { color: '#FFFFFF' }]}
-                    />
-                    <View style={styles.statsStrip}>
-                        <View style={[styles.statPill, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-                            <TrendingUp size={14} color="#66BB6A" />
-                            <AnimatedValue
-                                value={income}
-                                symbol={"+" + symbol}
-                                style={[styles.statValue, { color: '#66BB6A' }]}
-                            />
+                        <AnimatedValue
+                            value={balance}
+                            symbol={symbol}
+                            style={[styles.balanceText, { color: '#FFFFFF' }]}
+                            adjustSize={true}
+                        />
+                        <View style={styles.statsStrip}>
+                            <View style={[styles.statPill, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
+                                <TrendingUp size={14} color="#146C2E" />
+                                <AnimatedValue
+                                    value={income}
+                                    symbol={"+" + symbol}
+                                    style={[styles.statValue, { color: '#146C2E' }]}
+                                />
+                            </View>
+                            <View style={[styles.statPill, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
+                                <TrendingDown size={14} color="#B3261E" />
+                                <AnimatedValue
+                                    value={expense}
+                                    symbol={"-" + symbol}
+                                    style={[styles.statValue, { color: '#B3261E' }]}
+                                />
+                            </View>
                         </View>
-                        <View style={[styles.statPill, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-                            <TrendingDown size={14} color="#F44336" />
-                            <AnimatedValue
-                                value={expense}
-                                symbol={"-" + symbol}
-                                style={[styles.statValue, { color: '#F44336' }]}
-                            />
+                        <View style={styles.accentMoney}>
+                            <DollarSign size={80} color="rgba(255,255,255,0.05)" style={{ transform: [{ rotate: '15deg' }] }} />
                         </View>
-                    </View>
-                    <View style={styles.accentMoney}>
-                        <DollarSign size={80} color="rgba(255,255,255,0.05)" style={{ transform: [{ rotate: '15deg' }] }} />
-                    </View>
-                </Animated.View>
+                    </Animated.View>
+                )}
+
+                {/* Accounts Reel removed following user request */}
 
                 {/* Quick Actions */}
-                <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.shortcuts}>
-                    <TouchableOpacity style={styles.shortcutItem} onPress={() => navigation.navigate('AddTransaction')}>
-                        <View style={[styles.shortcutIcon, { backgroundColor: colors.primaryContainer }]}>
-                            <Plus color={colors.primary} size={24} />
-                        </View>
-                        <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Flow</Text>
-                    </TouchableOpacity>
+                {widgets.shortcuts && (
+                    <Animated.View entering={FadeInDown.delay(300).duration(600)} style={styles.shortcuts}>
+                        <SoundButton style={styles.shortcutItem} onPress={() => navigation.navigate('AddTransaction')}>
+                            <View style={[styles.shortcutIcon, { backgroundColor: colors.primaryContainer }]}>
+                                <Plus color={colors.primary} size={24} />
+                            </View>
+                            <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Flow</Text>
+                        </SoundButton>
 
-                    <TouchableOpacity style={styles.shortcutItem} onPress={() => navigation.navigate('DebtTab')}>
-                        <View style={[styles.shortcutIcon, { backgroundColor: colors.card }]}>
-                            <DebtIcon color={colors.primary} size={24} />
-                        </View>
-                        <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Debt</Text>
-                    </TouchableOpacity>
+                        <SoundButton style={styles.shortcutItem} onPress={() => navigation.navigate('Calendar')}>
+                            <View style={[styles.shortcutIcon, { backgroundColor: colors.card }]}>
+                                <CalIcon color={colors.primary} size={24} />
+                            </View>
+                            <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Calendar</Text>
+                        </SoundButton>
 
-                    <TouchableOpacity style={styles.shortcutItem} onPress={() => navigation.navigate('ReportsTab')}>
-                        <View style={[styles.shortcutIcon, { backgroundColor: colors.card }]}>
-                            <PieIcon color={colors.primary} size={24} />
-                        </View>
-                        <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Report</Text>
-                    </TouchableOpacity>
-                </Animated.View>
+                        <SoundButton style={styles.shortcutItem} onPress={() => navigation.navigate('DebtTab')}>
+                            <View style={[styles.shortcutIcon, { backgroundColor: colors.card }]}>
+                                <DebtIcon color={colors.primary} size={24} />
+                            </View>
+                            <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Debt</Text>
+                        </SoundButton>
+
+                        <SoundButton style={styles.shortcutItem} onPress={() => navigation.navigate('ReportsTab')}>
+                            <View style={[styles.shortcutIcon, { backgroundColor: colors.card }]}>
+                                <PieIcon color={colors.primary} size={24} />
+                            </View>
+                            <Text style={[styles.shortcutLabel, { color: colors.onSurface }]}>Report</Text>
+                        </SoundButton>
+                    </Animated.View>
+                )}
 
                 {/* Analytics Snapshot */}
-                <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Expense Analytics</Text>
-                    <View style={[styles.timeChip, { backgroundColor: colors.card }]}>
-                        <Text style={[styles.timeText, { color: colors.primary }]}>WEEK</Text>
-                    </View>
-                </Animated.View>
+                {widgets.analytics && (
+                    <>
+                        <Animated.View entering={FadeInDown.delay(400).duration(600)} style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Expense Analytics</Text>
+                            <View style={[styles.timeChip, { backgroundColor: colors.card }]}>
+                                <Text style={[styles.timeText, { color: colors.primary }]}>WEEK</Text>
+                            </View>
+                        </Animated.View>
 
-                <Animated.View entering={FadeInUp.delay(500).duration(800)}>
-                    <GlassCard style={styles.chartWrapper} cornerRadius={32}>
-                        <LineChart
-                            data={chartData}
-                            height={160}
-                            width={width - 80}
-                            spacing={44}
-                            initialSpacing={24}
-                            color={colors.primary}
-                            thickness={4}
-                            hideRules
-                            hideYAxisText
-                            yAxisThickness={0}
-                            xAxisThickness={0}
-                            showValuesAsDataPointsText={true}
-                            textColor={colors.onSurfaceVariant}
-                            textShiftY={-12}
-                            textShiftX={-4}
-                            dataPointsColor={colors.primary}
-                            dataPointsRadius={4}
-                            xAxisLabelTextStyle={{ color: colors.outline, fontSize: 10 }}
-                        />
-                    </GlassCard>
-                </Animated.View>
+                        <Animated.View entering={FadeInUp.delay(500).duration(800)}>
+                            <GlassCard style={styles.chartWrapper} cornerRadius={32}>
+                                <LineChart
+                                    data={chartData}
+                                    height={160}
+                                    width={width - 80}
+                                    spacing={44}
+                                    initialSpacing={24}
+                                    color={colors.primary}
+                                    thickness={4}
+                                    hideRules
+                                    hideYAxisText
+                                    yAxisThickness={0}
+                                    xAxisThickness={0}
+                                    showValuesAsDataPointsText={true}
+                                    textColor={colors.onSurfaceVariant}
+                                    textShiftY={-12}
+                                    textShiftX={-4}
+                                    dataPointsColor={colors.primary}
+                                    dataPointsRadius={4}
+                                    xAxisLabelTextStyle={{ color: colors.outline, fontSize: 10 }}
+                                />
+                            </GlassCard>
+                        </Animated.View>
+                    </>
+                )}
 
                 {/* Recent Activity */}
-                <Animated.View entering={FadeInDown.delay(600).duration(600)} style={styles.recentHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Recent Streams</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('TransactionsTab')}>
-                        <Text style={{ color: colors.primary, fontWeight: 'bold' }}>See All</Text>
-                    </TouchableOpacity>
-                </Animated.View>
+                {widgets.recent && (
+                    <>
+                        <Animated.View entering={FadeInDown.delay(600).duration(600)} style={styles.recentHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Recent Streams</Text>
+                            <SoundButton onPress={() => navigation.navigate('TransactionsTab')}>
+                                <Text style={{ color: colors.primary, fontWeight: 'bold' }}>See All</Text>
+                            </SoundButton>
+                        </Animated.View>
 
-                <View style={styles.recentFlows}>
-                    {transactions.map((t, i) => {
-                        const IconComp = CATEGORY_ICONS[t.icon] || CATEGORY_ICONS.tag || Target;
-                        return (
-                            <View key={i}>
-                                <GlassCard style={styles.txCard} cornerRadius={20}>
-                                    <View style={styles.txInner}>
-                                        <View style={[styles.txIconBox, { backgroundColor: t.category_color + '20' }]}>
-                                            <IconComp color={t.category_color} size={20} />
-                                        </View>
-                                        <View style={styles.txInfo}>
-                                            <Text style={[styles.txTitle, { color: colors.onSurface }]}>{t.category_name}</Text>
-                                            <Text style={[styles.txDate, { color: colors.onSurfaceVariant }]}>{format(new Date(t.date), 'MMM dd')}</Text>
-                                        </View>
-                                        <Text style={[styles.txValue, { color: t.type === 'income' ? '#146C2E' : colors.onSurface }]}>
-                                            {t.type === 'income' ? '+' : '-'}{symbol}{t.amount.toLocaleString()}
-                                        </Text>
+                        <View style={styles.recentFlows}>
+                            {transactions.map((t, i) => {
+                                const IconComp = CATEGORY_ICONS[t.icon] || CATEGORY_ICONS.tag || Target;
+                                return (
+                                    <View key={i}>
+                                        <GlassCard style={styles.txCard} cornerRadius={20}>
+                                            <View style={styles.txInner}>
+                                                <View style={[styles.txIconBox, { backgroundColor: colors.primaryContainer }]}>
+                                                    <IconComp color={colors.primary} size={20} />
+                                                </View>
+                                                <View style={styles.txInfo}>
+                                                    <Text style={[styles.txTitle, { color: colors.onSurface }]}>{t.category_name}</Text>
+                                                    <Text style={[styles.txDate, { color: colors.onSurfaceVariant }]}>{format(new Date(t.date), 'MMM dd')}</Text>
+                                                </View>
+                                                <Text style={[styles.txValue, { color: t.type === 'income' ? '#146C2E' : colors.onSurface }]}>
+                                                    {t.type === 'income' ? '+' : '-'}{symbol}{(t.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </Text>
+                                            </View>
+                                        </GlassCard>
                                     </View>
-                                </GlassCard>
-                            </View>
-                        );
-                    })}
-                </View>
+                                );
+                            })}
+                        </View>
+                    </>
+                )}
+
+                {/* Budget Health (Advanced Option) */}
+                {widgets.health && budgetHealth.length > 0 && (
+                    <Animated.View entering={FadeInDown.delay(500).duration(600)} style={styles.section}>
+                        <View style={styles.sectionHeader}>
+                            <Text style={[styles.sectionTitle, { color: colors.onSurface }]}>Budget Health ({format(new Date(), 'MMMM')})</Text>
+                            <SoundButton onPress={() => navigation.navigate('ManageCategories')}>
+                                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>MANAGE</Text>
+                            </SoundButton>
+                        </View>
+                        <View style={styles.budgetGrid}>
+                            {budgetHealth.map((b) => {
+                                const percent = Math.min((b.spent / b.budget) * 100, 100);
+                                const isOver = b.spent > b.budget;
+                                return (
+                                    <View key={b.id} style={[styles.budgetCard, { backgroundColor: colors.card }]}>
+                                        <View style={styles.budgetHeader}>
+                                            <Text style={[styles.budgetName, { color: colors.onSurface }]}>{b.name}</Text>
+                                            <Text style={[styles.budgetDetail, { color: isOver ? '#B3261E' : colors.onSurfaceVariant }]}>
+                                                {symbol}{Math.round(b.spent)} / {symbol}{Math.round(b.budget)}
+                                            </Text>
+                                        </View>
+                                        <View style={[styles.budgetProgressBg, { backgroundColor: colors.outline + '20' }]}>
+                                            <View style={[styles.budgetProgressBar, { width: `${percent}%`, backgroundColor: isOver ? '#B3261E' : b.color }]} />
+                                        </View>
+                                    </View>
+                                );
+                            })}
+                        </View>
+                    </Animated.View>
+                )}
+
+                <SoundButton
+                    style={[styles.customizeBtn, { borderColor: colors.outline }]}
+                    onPress={() => setShowWidgetEditor(true)}
+                >
+                    <Settings2 size={18} color={colors.onSurfaceVariant} />
+                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 14, fontWeight: '600' }}>Customize Dashboard</Text>
+                </SoundButton>
+
+                <View style={{ height: 40 }} />
             </ScrollView>
 
-            <TouchableOpacity
+            <SoundButton
                 style={[styles.mainFab, { backgroundColor: colors.primary }]}
                 onPress={() => navigation.navigate('AddTransaction')}
             >
                 <Plus color={colors.onPrimary} size={32} />
-            </TouchableOpacity>
+            </SoundButton>
 
             <Modal visible={isMenuOpen} transparent onRequestClose={() => setIsMenuOpen(false)}>
                 <View style={styles.modalBackdrop}>
@@ -319,9 +502,9 @@ const Dashboard = ({ navigation }: any) => {
                                 />
                                 <Text style={[styles.brand, { color: colors.onSurface }]}>Budgeto</Text>
                             </View>
-                            <TouchableOpacity onPress={() => setIsMenuOpen(false)}>
+                            <SoundButton onPress={() => setIsMenuOpen(false)}>
                                 <X color={colors.onSurface} size={28} />
-                            </TouchableOpacity>
+                            </SoundButton>
                         </View>
 
                         <View style={styles.sidebarMenu}>
@@ -330,18 +513,22 @@ const Dashboard = ({ navigation }: any) => {
                             <MenuItem icon={DebtIcon} label="Debt Center" tab="DebtTab" />
                             <MenuItem icon={PieIcon} label="Visual Reports" tab="ReportsTab" />
                             <MenuItem icon={ReceiptText} label="All Flows" tab="TransactionsTab" />
+                            <MenuItem icon={Landmark} label="Financial Vaults" route="ManageAccounts" />
                             <MenuItem icon={Palette} label="Category Hub" route="ManageCategories" />
-                            <MenuItem icon={Shield} label="Security Center" tab="SettingsTab" />
+                            <MenuItem icon={Shield} label="Security Center" route="SecurityCenter" />
                         </View>
 
                         <View style={styles.sidebarFooter}>
-                            <View style={[styles.proBanner, { backgroundColor: colors.card }]}>
+                            <SoundButton
+                                style={[styles.proBanner, { backgroundColor: colors.primaryContainer }]}
+                                onPress={() => { setIsMenuOpen(false); setAlertConfig({ visible: true, title: 'Budgeto Plus+', message: 'Premium features are coming soon! Stay tuned.', type: 'info' }); }}
+                            >
                                 <Sparkles color={colors.primary} size={20} />
-                                <Text style={{ color: colors.onSurface, fontSize: 13, fontWeight: 'bold' }}>Stable V2.2</Text>
-                            </View>
+                                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '700' }}>Get Budgeto Plus+</Text>
+                            </SoundButton>
                         </View>
                     </Animated.View>
-                    <TouchableOpacity
+                    <SoundButton
                         style={{ flex: 1 }}
                         activeOpacity={1}
                         onPress={() => setIsMenuOpen(false)}
@@ -356,6 +543,82 @@ const Dashboard = ({ navigation }: any) => {
                 type={alertConfig.type}
                 onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
             />
+
+            <Modal visible={showWidgetEditor} transparent animationType="slide" onRequestClose={() => setShowWidgetEditor(false)}>
+                <View style={[styles.bottomDrawerBackdrop, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                    <View style={[styles.modalCard, { backgroundColor: colors.surface, paddingBottom: 40, width: '100%' }]}>
+                        <View style={styles.modalHeaderRow}>
+                            <View>
+                                <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Dashboard Grid</Text>
+                                <Text style={{ color: colors.onSurfaceVariant, fontSize: 13 }}>Personalize your financial overview</Text>
+                            </View>
+                            <SoundButton onPress={() => setShowWidgetEditor(false)} style={{ backgroundColor: colors.outline + '20', padding: 8, borderRadius: 20 }}>
+                                <X color={colors.onSurface} size={20} />
+                            </SoundButton>
+                        </View>
+                        <ScrollView style={{ marginTop: 10 }} showsVerticalScrollIndicator={false}>
+                            <View style={{ gap: 12 }}>
+                                {Object.keys(widgets).map((key) => {
+                                    const meta = WIDGET_META[key as keyof typeof widgets];
+                                    const active = widgets[key as keyof typeof widgets];
+                                    return (
+                                        <SoundButton
+                                            key={key}
+                                            onPress={() => toggleWidget(key as keyof typeof widgets)}
+                                            style={[
+                                                styles.widgetCard,
+                                                {
+                                                    backgroundColor: active ? colors.primaryContainer : colors.card,
+                                                    borderColor: active ? colors.primary : colors.outline + '40'
+                                                }
+                                            ]}
+                                        >
+                                            <View style={[styles.widgetIconBox, { backgroundColor: active ? colors.primary : colors.outline + '20' }]}>
+                                                <meta.icon size={20} color={active ? colors.onPrimary : colors.onSurfaceVariant} />
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={[styles.widgetTitle, { color: colors.onSurface }]}>{meta.title}</Text>
+                                                <Text style={[styles.widgetDesc, { color: colors.onSurfaceVariant }]}>{meta.desc}</Text>
+                                            </View>
+                                            <Switch
+                                                value={active}
+                                                onValueChange={() => toggleWidget(key as keyof typeof widgets)}
+                                                trackColor={{ false: colors.outline, true: colors.primary }}
+                                                thumbColor={Platform.OS === 'ios' ? undefined : colors.surface}
+                                            />
+                                        </SoundButton>
+                                    );
+                                })}
+                            </View>
+                        </ScrollView>
+                    </View>
+                </View>
+            </Modal>
+
+            <Modal visible={showTour} transparent animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center', padding: 24, zIndex: 10000 }}>
+                    <Animated.View entering={FadeInUp.duration(500)} style={{ backgroundColor: colors.surface, padding: 30, borderRadius: 28, width: '100%', maxWidth: 400, alignItems: 'center', elevation: 12 }}>
+                        <Info color={colors.primary} size={48} style={{ marginBottom: 20 }} />
+                        <Text style={{ fontSize: 26, fontWeight: 'bold', color: colors.onSurface, marginBottom: 12, textAlign: 'center' }}>
+                            {tourStep === 0 ? "Welcome to Budgeto!" : tourStep === 1 ? "Quick Actions" : tourStep === 2 ? "Analytics & Health" : "You're all set!"}
+                        </Text>
+                        <Text style={{ fontSize: 16, color: colors.onSurfaceVariant, textAlign: 'center', marginBottom: 32, lineHeight: 24 }}>
+                            {tourStep === 0 && "Your personalized financial command center. Tap the top-left menu to access settings, connect backups, and configure your app."}
+                            {tourStep === 1 && "Use the Quick Action buttons or the + FAB below to instantly record debts, expenses, and check reports."}
+                            {tourStep === 2 && "Scroll down to see your Expense Analytics and Budget Health. Keep track of everything at a glance."}
+                            {tourStep === 3 && "You can also fully customize your Dashboard! Toggle widgets on or off using the Customize Dashboard button at the bottom."}
+                        </Text>
+                        <SoundButton
+                            style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 36, borderRadius: 100, width: '100%', alignItems: 'center' }}
+                            onPress={handleNextTourStep}
+                        >
+                            <Text style={{ color: colors.onPrimary, fontWeight: 'bold', fontSize: 16 }}>
+                                {tourStep < 3 ? 'Next Tip' : 'Get Started'}
+                            </Text>
+                        </SoundButton>
+                    </Animated.View>
+                </View>
+            </Modal>
         </View>
     );
 };
@@ -374,11 +637,11 @@ const styles = StyleSheet.create({
     cardTag: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5 },
     balanceText: { fontSize: 42, fontWeight: '500', marginBottom: 28, letterSpacing: -1 },
     statsStrip: { flexDirection: 'row', gap: 12 },
-    statPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-    statValue: { fontSize: 14, fontWeight: '600' },
+    statPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, elevation: 4 },
+    statValue: { fontSize: 14, fontWeight: '700' },
     shortcuts: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 20, marginBottom: 40 },
     shortcutItem: { alignItems: 'center', gap: 8 },
-    shortcutIcon: { width: 66, height: 66, borderRadius: 33, justifyContent: 'center', alignItems: 'center' },
+    shortcutIcon: { width: 60, height: 60, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
     shortcutLabel: { fontSize: 12, fontWeight: '500' },
     sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 24, marginBottom: 16 },
     sectionTitle: { fontSize: 20, fontWeight: '400' },
@@ -394,8 +657,9 @@ const styles = StyleSheet.create({
     txTitle: { fontSize: 16, fontWeight: '500' },
     txDate: { fontSize: 13, marginTop: 2 },
     txValue: { fontSize: 16, fontWeight: '600' },
-    mainFab: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 20, justifyContent: 'center', alignItems: 'center', elevation: 8 },
+    mainFab: { position: 'absolute', bottom: 30, right: 20, width: 64, height: 64, borderRadius: 16, justifyContent: 'center', alignItems: 'center', elevation: 8 },
     modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row' },
+    bottomDrawerBackdrop: { flex: 1, justifyContent: 'flex-end' },
     sidebar: { width: '80%', height: '100%', padding: 24, paddingTop: 64 },
     sidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 48 },
     brand: { fontSize: 28, fontWeight: '400', letterSpacing: -1 },
@@ -404,7 +668,23 @@ const styles = StyleSheet.create({
     menuIconContainer: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 18 },
     menuText: { fontSize: 18, fontWeight: '400' },
     sidebarFooter: { position: 'absolute', bottom: 40, left: 24, right: 24 },
-    proBanner: { padding: 20, borderRadius: 24, flexDirection: 'row', gap: 12, alignItems: 'center' }
+    proBanner: { padding: 20, borderRadius: 24, flexDirection: 'row', gap: 12, alignItems: 'center' },
+    section: { marginBottom: 32 },
+    budgetGrid: { paddingHorizontal: 20, gap: 12 },
+    budgetCard: { padding: 16, borderRadius: 24, elevation: 1 },
+    budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+    budgetName: { fontSize: 16, fontWeight: '500' },
+    budgetDetail: { fontSize: 12, fontWeight: '700' },
+    budgetProgressBg: { height: 8, borderRadius: 4, overflow: 'hidden' },
+    budgetProgressBar: { height: '100%', borderRadius: 4 },
+    customizeBtn: { padding: 16, marginHorizontal: 20, marginTop: 10, borderRadius: 16, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12 },
+    modalCard: { padding: 24, borderTopLeftRadius: 36, borderTopRightRadius: 36, maxHeight: '80%' },
+    modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+    modalTitle: { fontSize: 22, fontWeight: '700' },
+    widgetCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 24, borderWidth: 1, gap: 16 },
+    widgetIconBox: { width: 44, height: 44, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    widgetTitle: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
+    widgetDesc: { fontSize: 13, lineHeight: 18 }
 });
 
 export default Dashboard;

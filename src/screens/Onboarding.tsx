@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, Dimensions } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import Animated, { FadeInDown, FadeInUp, FadeIn, ZoomIn } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
@@ -101,7 +102,7 @@ const Onboarding = ({ onFinish, onSetPasscode }: { onFinish: () => void, onSetPa
                     ))}
                 </View>
 
-                <TouchableOpacity
+                <SoundButton
                     style={[styles.nextBtn, { backgroundColor: isDark ? '#D0BCFF' : '#6750A4' }]}
                     onPress={next}
                     activeOpacity={0.8}
@@ -110,7 +111,7 @@ const Onboarding = ({ onFinish, onSetPasscode }: { onFinish: () => void, onSetPa
                         {step === steps.length - 1 ? 'Start Flow' : 'Next'}
                     </Text>
                     <ArrowRight color={isDark ? '#381E72' : '#FFFFFF'} size={24} />
-                </TouchableOpacity>
+                </SoundButton>
             </Animated.View>
         </View>
     );

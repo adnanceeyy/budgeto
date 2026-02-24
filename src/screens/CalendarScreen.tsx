@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Dimensions } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday, isWithinInterval, isBefore } from 'date-fns';
@@ -9,7 +10,7 @@ import { dbService } from '../database/db';
 const { width } = Dimensions.get('window');
 
 const CalendarScreen = ({ navigation }: any) => {
-    const { theme, currency } = useTheme();
+    const { theme, currency, colors } = useTheme();
     const isDark = theme === 'dark';
     const [currentDate, setCurrentDate] = useState(new Date());
     const [rangeStart, setRangeStart] = useState<Date | null>(new Date());
@@ -62,13 +63,13 @@ const CalendarScreen = ({ navigation }: any) => {
 
     const renderHeader = () => (
         <View style={styles.header}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <SoundButton onPress={() => navigation.goBack()} style={styles.backBtn}>
                 <ChevronLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={24} />
-            </TouchableOpacity>
+            </SoundButton>
             <View style={styles.monthHeader}>
-                <TouchableOpacity onPress={prevMonth}><ChevronLeft color={isDark ? '#D0BCFF' : '#6750A4'} size={24} /></TouchableOpacity>
+                <SoundButton onPress={prevMonth}><ChevronLeft color={isDark ? '#D0BCFF' : '#6750A4'} size={24} /></SoundButton>
                 <Text style={[styles.monthText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{format(currentDate, 'MMMM yyyy')}</Text>
-                <TouchableOpacity onPress={nextMonth}><ChevronRight color={isDark ? '#D0BCFF' : '#6750A4'} size={24} /></TouchableOpacity>
+                <SoundButton onPress={nextMonth}><ChevronRight color={isDark ? '#D0BCFF' : '#6750A4'} size={24} /></SoundButton>
             </View>
             <View style={{ width: 40 }} />
         </View>
@@ -93,7 +94,7 @@ const CalendarScreen = ({ navigation }: any) => {
             const isCurrentMonth = isSameMonth(day, monthStart);
 
             days.push(
-                <TouchableOpacity
+                <SoundButton
                     key={i}
                     style={[
                         styles.cell,
@@ -118,7 +119,7 @@ const CalendarScreen = ({ navigation }: any) => {
                             {dayData.expense > 0 && <View style={[styles.dot, { backgroundColor: '#B3261E' }]} />}
                         </View>
                     )}
-                </TouchableOpacity>
+                </SoundButton>
             );
 
             if ((i + 1) % 7 === 0) {
@@ -160,9 +161,9 @@ const CalendarScreen = ({ navigation }: any) => {
                             {rangeEnd ? ` — ${format(rangeEnd, 'MMM d')}` : ''}
                         </Text>
                         {(rangeStart || rangeEnd) && (
-                            <TouchableOpacity onPress={() => { setRangeStart(new Date()); setRangeEnd(null); }}>
+                            <SoundButton onPress={() => { setRangeStart(new Date()); setRangeEnd(null); }}>
                                 <Text style={{ color: isDark ? '#D0BCFF' : '#6750A4', fontSize: 12, fontWeight: 'bold' }}>CLEAR</Text>
-                            </TouchableOpacity>
+                            </SoundButton>
                         )}
                     </View>
                 </View>
@@ -186,7 +187,7 @@ const CalendarScreen = ({ navigation }: any) => {
                     ) : (
                         selectedTransactions.map((item) => (
                             <View key={item.id} style={[styles.txItem, { backgroundColor: isDark ? '#1D1B20' : '#F7F2FA' }]}>
-                                <View style={[styles.iconBox, { backgroundColor: item.category_color + '20' }]}>
+                                <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
                                     {item.type === 'income' ? <ArrowDownLeft color="#146C2E" size={20} /> : <ArrowUpRight color="#B3261E" size={20} />}
                                 </View>
                                 <View style={styles.details}>
@@ -196,7 +197,7 @@ const CalendarScreen = ({ navigation }: any) => {
                                     </Text>
                                 </View>
                                 <Text style={[styles.amount, { color: item.type === 'income' ? '#146C2E' : (isDark ? '#E6E1E5' : '#1C1B1F') }]}>
-                                    {item.type === 'income' ? '+' : '-'}{symbol}{item.amount.toLocaleString()}
+                                    {item.type === 'income' ? '+' : '-'}{symbol}{item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </Text>
                             </View>
                         ))

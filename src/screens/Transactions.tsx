@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, FlatList, TouchableOpacity, Platform, TextInput } from 'react-native';
+import { StyleSheet, View, Text, FlatList, Platform, TextInput } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import Animated, { FadeInDown, Layout } from 'react-native-reanimated';
 import { useTheme } from '../theme/ThemeContext';
 import { ColorPresets } from '../theme/colors';
@@ -71,27 +72,35 @@ const Transactions = ({ navigation }: any) => {
         const IconComp = CATEGORY_ICONS[item.icon] || CATEGORY_ICONS.tag || Target;
         return (
             <Animated.View entering={FadeInDown.delay(index * 50).duration(400)} layout={Layout.springify()}>
-                <TouchableOpacity
+                <SoundButton
                     style={[styles.txItem, { backgroundColor: colors.card }]}
                     onPress={() => navigation.navigate('AddTransaction', { transaction: item })}
                 >
-                    <View style={[styles.iconBox, { backgroundColor: item.category_color + '20' }]}>
-                        <IconComp size={20} color={item.category_color} />
+                    <View style={[styles.iconBox, { backgroundColor: colors.primaryContainer }]}>
+                        <IconComp size={20} color={colors.primary} />
                     </View>
                     <View style={styles.details}>
                         <Text style={[styles.catName, { color: colors.onSurface }]}>{item.category_name || 'General'}</Text>
-                        <Text style={[styles.date, { color: colors.onSurfaceVariant }]}>{format(new Date(item.date), 'MMM dd, yyyy')}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.date, { color: colors.onSurfaceVariant }]}>{format(new Date(item.date), 'MMM dd, yyyy')}</Text>
+                            {item.account_name && (
+                                <>
+                                    <Text style={{ color: colors.onSurfaceVariant, fontSize: 10 }}>•</Text>
+                                    <Text style={[styles.date, { color: colors.primary, fontWeight: '600' }]}>{item.account_name}</Text>
+                                </>
+                            )}
+                        </View>
                         {item.note ? <Text style={[styles.note, { color: colors.onSurfaceVariant }]}>{item.note}</Text> : null}
                     </View>
                     <View style={styles.amountBox}>
                         <Text style={[styles.amount, { color: item.type === 'income' ? '#146C2E' : colors.onSurface }]}>
-                            {item.type === 'income' ? '+' : '-'}{symbol}{item.amount.toLocaleString()}
+                            {item.type === 'income' ? '+' : '-'}{symbol}{(item.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
-                        <TouchableOpacity onPress={() => confirmDelete(item.id)} style={styles.deleteBtn}>
+                        <SoundButton onPress={() => confirmDelete(item.id)} style={styles.deleteBtn}>
                             <Trash2 size={16} color={colors.error || '#B3261E'} />
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
-                </TouchableOpacity>
+                </SoundButton>
             </Animated.View>
         );
     };
@@ -101,17 +110,17 @@ const Transactions = ({ navigation }: any) => {
             <View style={styles.container}>
                 {!isSearching ? (
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+                        <SoundButton onPress={() => navigation.goBack()} style={styles.headerBtn}>
                             <ChevronLeft color={colors.onSurface} size={24} />
-                        </TouchableOpacity>
+                        </SoundButton>
                         <Text style={[styles.title, { color: colors.onSurface }]}>All Flows</Text>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <TouchableOpacity onPress={() => setIsSearching(true)} style={styles.headerBtn}>
+                            <SoundButton onPress={() => setIsSearching(true)} style={styles.headerBtn}>
                                 <Search color={colors.onSurface} size={24} />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => navigation.navigate('AddTransaction')} style={styles.headerBtn}>
+                            </SoundButton>
+                            <SoundButton onPress={() => navigation.navigate('AddTransaction')} style={styles.headerBtn}>
                                 <Plus color={colors.onSurface} size={24} />
-                            </TouchableOpacity>
+                            </SoundButton>
                         </View>
                     </View>
                 ) : (
@@ -125,9 +134,9 @@ const Transactions = ({ navigation }: any) => {
                             value={searchQuery}
                             onChangeText={handleSearch}
                         />
-                        <TouchableOpacity onPress={() => { setIsSearching(false); handleSearch(''); }}>
+                        <SoundButton onPress={() => { setIsSearching(false); handleSearch(''); }}>
                             <X color={colors.onSurface} size={20} />
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
                 )}
 
@@ -167,16 +176,16 @@ const styles = StyleSheet.create({
     searchBar: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 32, marginBottom: 24, gap: 12 },
     searchInput: { flex: 1, fontSize: 16, fontWeight: '400' },
     list: { paddingBottom: 100, paddingHorizontal: 16 },
-    txItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 20, marginBottom: 12 },
-    iconBox: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    txItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 16, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
+    iconBox: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
     dot: { width: 10, height: 10, borderRadius: 5 },
-    details: { flex: 1 },
-    catName: { fontSize: 16, fontWeight: '600' },
-    date: { fontSize: 13, marginTop: 4 },
-    note: { fontSize: 14, marginTop: 4, fontStyle: 'italic', opacity: 0.8 },
-    amountBox: { alignItems: 'flex-end', justifyContent: 'space-between', height: '100%' },
-    amount: { fontSize: 17, fontWeight: '700' },
-    deleteBtn: { padding: 8, marginTop: 8 },
+    details: { flex: 1, justifyContent: 'center' },
+    catName: { fontSize: 15, fontWeight: '600' },
+    date: { fontSize: 12, marginTop: 2 },
+    note: { fontSize: 13, marginTop: 2, fontStyle: 'italic', opacity: 0.7 },
+    amountBox: { alignItems: 'flex-end', justifyContent: 'center', gap: 4 },
+    amount: { fontSize: 15, fontWeight: '700' },
+    deleteBtn: { padding: 4 },
     empty: { marginTop: 120, alignItems: 'center', gap: 16 },
     emptyText: { fontSize: 16, fontWeight: '500' }
 });

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, ScrollView, Platform, Modal, TouchableWithoutFeedback, Keyboard, FlatList, KeyboardAvoidingView } from 'react-native';
+import { StyleSheet, View, Text, TextInput, ScrollView, Platform, Modal, Pressable, Keyboard, FlatList, KeyboardAvoidingView } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { useTheme } from '../theme/ThemeContext';
 import { ColorPresets } from '../theme/colors';
 import Background from '../components/Background';
-import { X, Check, Target, ShoppingBag, Coffee, Car, Home, Zap, Heart, Gift, Briefcase, DollarSign, Utensils, Smartphone, Globe, Film, HeartPulse, Sparkles, Trash2, Edit2, Plus, FileText, ChevronRight, ShoppingCart } from 'lucide-react-native';
+import { X, Check, Plus, Trash2, Edit2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { dbService } from '../database/db';
 import ModalAlert from '../components/ModalAlert';
@@ -18,6 +19,8 @@ const AddTransaction = ({ navigation, route }: any) => {
     const [category, setCategory] = useState<any>(null);
     const [type, setType] = useState<'income' | 'expense'>('expense');
     const [categories, setCategories] = useState<any[]>([]);
+    const [accounts, setAccounts] = useState<any[]>([]);
+    const [selectedAccount, setSelectedAccount] = useState<any>(null);
 
     const [showCatModal, setShowCatModal] = useState(false);
     const [isEditingCat, setIsEditingCat] = useState(false);
@@ -38,14 +41,34 @@ const AddTransaction = ({ navigation, route }: any) => {
     };
     const symbol = currencySymbols[currency] || '₹';
 
+    const CURRENCIES = [
+        { code: 'INR', symbol: '₹' },
+        { code: 'USD', symbol: '$' },
+        { code: 'EUR', symbol: '€' },
+        { code: 'GBP', symbol: '£' },
+        { code: 'JPY', symbol: '¥' }
+    ];
+
     useEffect(() => {
         loadCats();
+        loadAccounts();
         if (editTx) {
             setAmount(editTx.amount.toString());
             setNote(editTx.note || '');
             setType(editTx.type);
         }
     }, [editTx]);
+
+    const loadAccounts = async () => {
+        const accs = await dbService.getAccounts();
+        setAccounts(accs);
+        if (editTx) {
+            const currentAcc = accs.find((a: any) => a.id === editTx.account_id);
+            if (currentAcc) setSelectedAccount(currentAcc);
+        } else if (!selectedAccount && accs.length > 0) {
+            setSelectedAccount(accs[0]);
+        }
+    };
 
     const loadCats = async () => {
         const cats = await dbService.getCategories();
@@ -76,6 +99,7 @@ const AddTransaction = ({ navigation, route }: any) => {
                 type: type,
                 amount: parsedAmount,
                 category_id: category.id,
+                account_id: selectedAccount?.id || null,
                 note: note.trim(),
                 date: editTx ? editTx.date : new Date().toISOString()
             };
@@ -165,15 +189,15 @@ const AddTransaction = ({ navigation, route }: any) => {
             >
                 <View style={[styles.container, { backgroundColor: colors.background }]}>
                     <View style={styles.header}>
-                        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBtn}>
+                        <SoundButton onPress={() => navigation.goBack()} style={styles.headerBtn}>
                             <X color={colors.onSurface} size={24} />
-                        </TouchableOpacity>
+                        </SoundButton>
                         <Text style={[styles.headerTitle, { color: colors.onSurface }]}>
                             {editTx ? 'Edit Flow' : 'Flow Stream'}
                         </Text>
-                        <TouchableOpacity onPress={handleSave} style={[styles.saveFab, { backgroundColor: colors.primary }]}>
+                        <SoundButton onPress={handleSave} style={[styles.saveFab, { backgroundColor: colors.primary }]}>
                             <Check color={colors.onPrimary} size={24} />
-                        </TouchableOpacity>
+                        </SoundButton>
                     </View>
 
                     <ScrollView
@@ -183,7 +207,7 @@ const AddTransaction = ({ navigation, route }: any) => {
                     >
                         <View style={styles.typeRow}>
                             {['expense', 'income'].map((t) => (
-                                <TouchableOpacity
+                                <SoundButton
                                     key={t}
                                     onPress={() => setType(t as any)}
                                     style={[
@@ -195,7 +219,7 @@ const AddTransaction = ({ navigation, route }: any) => {
                                     <Text style={[styles.typeChipText, { color: type === t ? colors.onPrimary : colors.onSurfaceVariant }]}>
                                         {t.charAt(0).toUpperCase() + t.slice(1)}
                                     </Text>
-                                </TouchableOpacity>
+                                </SoundButton>
                             ))}
                         </View>
 
@@ -217,15 +241,15 @@ const AddTransaction = ({ navigation, route }: any) => {
                         <View style={styles.section}>
                             <View style={styles.sectionHeader}>
                                 <Text style={[styles.label, { color: colors.primary }]}>Category</Text>
-                                <TouchableOpacity onPress={() => setShowCatModal(true)} style={[styles.addBtn, { backgroundColor: colors.primaryContainer }]}>
+                                <SoundButton onPress={() => setShowCatModal(true)} style={[styles.addBtn, { backgroundColor: colors.primaryContainer }]}>
                                     <Plus color={colors.primary} size={18} />
-                                </TouchableOpacity>
+                                </SoundButton>
                             </View>
                             <View style={styles.categoryGrid}>
                                 {categories.map((cat) => {
                                     const IconComp = CATEGORY_ICONS[cat.icon] || CATEGORY_ICONS.tag;
                                     return (
-                                        <TouchableOpacity
+                                        <SoundButton
                                             key={cat.id}
                                             onPress={() => setCategory(cat)}
                                             onLongPress={() => openEditCat(cat)}
@@ -235,13 +259,55 @@ const AddTransaction = ({ navigation, route }: any) => {
                                                 { borderColor: colors.outline }
                                             ]}
                                         >
-                                            <IconComp size={16} color={cat.color} />
+                                            <IconComp size={16} color={colors.primary} />
                                             <Text style={[styles.catText, { color: colors.onSurface }]}>{cat.name}</Text>
-                                        </TouchableOpacity>
+                                        </SoundButton>
                                     );
                                 })}
                             </View>
                             <Text style={[styles.hintTxt, { color: colors.onSurfaceVariant }]}>Long press category to edit or delete</Text>
+                        </View>
+
+                        <View style={styles.section}>
+                            <View style={styles.sectionHeader}>
+                                <Text style={[styles.label, { color: colors.primary }]}>Payment Account</Text>
+                                <SoundButton onPress={() => navigation.navigate('ManageAccounts')} style={[styles.addBtn, { backgroundColor: colors.primaryContainer }]}>
+                                    <Plus color={colors.primary} size={18} />
+                                </SoundButton>
+                            </View>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
+                                {accounts.map((acc) => {
+                                    const IconComp = CATEGORY_ICONS[acc.icon] || CATEGORY_ICONS.tag;
+                                    return (
+                                        <SoundButton
+                                            key={acc.id}
+                                            onPress={() => setSelectedAccount(acc)}
+                                            style={[
+                                                styles.accChip,
+                                                selectedAccount?.id === acc.id && { backgroundColor: colors.primaryContainer, borderColor: colors.primary },
+                                                { borderColor: colors.outline }
+                                            ]}
+                                        >
+                                            <IconComp size={16} color={colors.primary} />
+                                            <View>
+                                                <Text style={[styles.accText, { color: colors.onSurface }]}>{acc.name}</Text>
+                                                <Text style={[styles.accSubText, { color: colors.onSurfaceVariant }]}>
+                                                    {CURRENCIES.find(c => c.code === acc.currency)?.symbol || '₹'}{acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </Text>
+                                            </View>
+                                        </SoundButton>
+                                    );
+                                })}
+                                {accounts.length === 0 && (
+                                    <SoundButton
+                                        style={[styles.accChip, { borderStyle: 'dashed', borderColor: colors.outline }]}
+                                        onPress={() => navigation.navigate('ManageAccounts')}
+                                    >
+                                        <Plus size={16} color={colors.outline} />
+                                        <Text style={{ color: colors.onSurfaceVariant }}>Add Account</Text>
+                                    </SoundButton>
+                                )}
+                            </ScrollView>
                         </View>
 
                         <View style={styles.section}>
@@ -258,7 +324,10 @@ const AddTransaction = ({ navigation, route }: any) => {
 
                     {/* Category Modal (Create/Edit) */}
                     <Modal visible={showCatModal} transparent animationType="slide">
-                        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={{ flex: 1 }}
+                        >
                             <View style={styles.modalOverlay}>
                                 <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
                                     <View style={styles.modalHeaderRow}>
@@ -266,19 +335,19 @@ const AddTransaction = ({ navigation, route }: any) => {
                                             {isEditingCat ? 'Edit Category' : 'New Category'}
                                         </Text>
                                         {isEditingCat && (
-                                            <TouchableOpacity onPress={() => handleDeleteCategory(editingCatId!)} style={styles.deleteBtn}>
+                                            <SoundButton onPress={() => handleDeleteCategory(editingCatId!)} style={styles.deleteBtn}>
                                                 <Trash2 color={colors.error || '#B3261E'} size={20} />
-                                            </TouchableOpacity>
+                                            </SoundButton>
                                         )}
                                     </View>
 
                                     <View style={styles.catInputRow}>
-                                        <TouchableOpacity
+                                        <SoundButton
                                             style={[styles.iconSelect, { backgroundColor: colors.card }]}
                                             onPress={() => setShowIconPicker(true)}
                                         >
                                             {React.createElement(CATEGORY_ICONS[newCatIcon] || CATEGORY_ICONS.tag, { size: 24, color: colors.primary })}
-                                        </TouchableOpacity>
+                                        </SoundButton>
                                         <TextInput
                                             style={[styles.modalInput, { color: colors.onSurface, borderBottomColor: colors.primary, flex: 1 }]}
                                             placeholder="Category Name"
@@ -289,18 +358,18 @@ const AddTransaction = ({ navigation, route }: any) => {
                                     </View>
 
                                     <View style={styles.modalActions}>
-                                        <TouchableOpacity onPress={resetCatModal} style={styles.modalActionBtn}>
+                                        <SoundButton onPress={resetCatModal} style={styles.modalActionBtn}>
                                             <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Cancel</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={handleSaveCategory} style={styles.modalActionBtn}>
+                                        </SoundButton>
+                                        <SoundButton onPress={handleSaveCategory} style={styles.modalActionBtn}>
                                             <Text style={{ color: colors.primary, fontWeight: 'bold' }}>
                                                 {isEditingCat ? 'Update' : 'Create'}
                                             </Text>
-                                        </TouchableOpacity>
+                                        </SoundButton>
                                     </View>
                                 </View>
                             </View>
-                        </TouchableWithoutFeedback>
+                        </KeyboardAvoidingView>
                     </Modal>
 
                     {/* Icon Picker Modal */}
@@ -309,31 +378,30 @@ const AddTransaction = ({ navigation, route }: any) => {
                             <View style={[styles.iconPickerCard, { backgroundColor: colors.surface }]}>
                                 <View style={styles.modalHeaderRow}>
                                     <Text style={[styles.modalTitle, { color: colors.onSurface }]}>Pick Icon</Text>
-                                    <TouchableOpacity onPress={() => setShowIconPicker(false)}>
+                                    <SoundButton onPress={() => setShowIconPicker(false)}>
                                         <X color={colors.onSurface} size={24} />
-                                    </TouchableOpacity>
+                                    </SoundButton>
                                 </View>
                                 <ScrollView contentContainerStyle={styles.iconGrid} showsVerticalScrollIndicator={false}>
                                     {Object.keys(CATEGORY_ICONS).map((key) => {
                                         const IconComp = CATEGORY_ICONS[key];
                                         return (
-                                            <TouchableOpacity
+                                            <SoundButton
                                                 key={key}
                                                 style={[styles.iconBox, { backgroundColor: colors.card }, newCatIcon === key && { backgroundColor: colors.primaryContainer }]}
                                                 onPress={() => { setNewCatIcon(key); setShowIconPicker(false); }}
                                             >
                                                 <IconComp size={24} color={newCatIcon === key ? colors.primary : colors.onSurfaceVariant} />
-                                            </TouchableOpacity>
+                                            </SoundButton>
                                         );
                                     })}
                                 </ScrollView>
-                                <TouchableOpacity style={styles.modalClose} onPress={() => setShowIconPicker(false)}>
+                                <SoundButton style={styles.modalClose} onPress={() => setShowIconPicker(false)}>
                                     <Text style={{ color: colors.primary, fontWeight: 'bold' }}>Close</Text>
-                                </TouchableOpacity>
+                                </SoundButton>
                             </View>
                         </View>
                     </Modal>
-
                     <ModalAlert
                         visible={alertConfig.visible}
                         title={alertConfig.title}
@@ -369,22 +437,26 @@ const styles = StyleSheet.create({
     categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     catChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
     catText: { fontSize: 14, fontWeight: '500' },
+    horizontalScroll: { marginHorizontal: -24, paddingHorizontal: 24 },
+    accChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 16, borderWidth: 1, gap: 12, marginRight: 12, minWidth: 140 },
+    accText: { fontSize: 14, fontWeight: '600' },
+    accSubText: { fontSize: 11, fontWeight: '500', marginTop: 2 },
     hintTxt: { fontSize: 12, marginTop: 12, opacity: 0.6 },
     noteInput: { borderBottomWidth: 1, paddingVertical: 12, fontSize: 16 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
-    modalCard: { borderRadius: 28, padding: 24, elevation: 6 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'center', padding: 24 },
+    modalCard: { borderRadius: 28, padding: 24, elevation: 12, maxHeight: '90%' },
     modalHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
-    modalTitle: { fontSize: 22, fontWeight: '400' },
+    modalTitle: { fontSize: 24, fontWeight: '400' },
     deleteBtn: { padding: 8 },
     catInputRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 24 },
     iconSelect: { width: 56, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
     modalInput: { borderBottomWidth: 2, paddingVertical: 12, fontSize: 16 },
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-    modalActionBtn: { padding: 12 },
-    iconPickerCard: { borderRadius: 28, padding: 24, width: '90%', maxHeight: '80%', alignSelf: 'center' },
+    modalActionBtn: { paddingVertical: 10, paddingHorizontal: 16 },
+    iconPickerCard: { borderRadius: 28, padding: 24, width: '100%', maxHeight: '80%', alignSelf: 'center', elevation: 12 },
     iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' },
     iconBox: { width: 48, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-    modalClose: { marginTop: 20, alignItems: 'center' }
+    modalClose: { marginTop: 24, paddingTop: 16, alignItems: 'center' }
 });
 
 export default AddTransaction;

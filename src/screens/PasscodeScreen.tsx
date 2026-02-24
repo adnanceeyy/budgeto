@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Modal } from 'react-native';
+import { StyleSheet, View, Text, Dimensions, Modal } from 'react-native';
+import SoundButton from '../components/SoundButton';
 import { useTheme } from '../theme/ThemeContext';
 import Background from '../components/Background';
 import { Lock, Delete, XCircle, ChevronLeft, X } from 'lucide-react-native';
@@ -45,12 +46,12 @@ const PasscodeScreen = ({ onComplete, navigation, title = "Enter Passcode" }: { 
         <Background>
             <View style={styles.container}>
                 {navigation && (
-                    <TouchableOpacity
+                    <SoundButton
                         style={styles.backBtn}
                         onPress={() => navigation.goBack()}
                     >
                         <ChevronLeft color={isDark ? '#E6E1E5' : '#1C1B1F'} size={28} />
-                    </TouchableOpacity>
+                    </SoundButton>
                 )}
                 <View style={styles.header}>
                     <View style={[styles.iconBox, { backgroundColor: isDark ? '#4F378B' : '#EADDFF' }]}>
@@ -78,7 +79,7 @@ const PasscodeScreen = ({ onComplete, navigation, title = "Enter Passcode" }: { 
 
                 <View style={styles.keypad}>
                     {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', '⌫'].map((key, i) => (
-                        <TouchableOpacity
+                        <SoundButton
                             key={i}
                             style={styles.key}
                             onPress={() => {
@@ -105,7 +106,7 @@ const PasscodeScreen = ({ onComplete, navigation, title = "Enter Passcode" }: { 
                                     <Text style={[styles.keyText, { color: isDark ? '#E6E1E5' : '#1C1B1F' }]}>{key}</Text>
                                 )}
                             </View>
-                        </TouchableOpacity>
+                        </SoundButton>
                     ))}
                 </View>
             </View>
